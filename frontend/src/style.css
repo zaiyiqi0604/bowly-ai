@@ -1,0 +1,112 @@
+:root {
+  --cream-50: #fff9ef;
+  --cream-100: #fff2de;
+  --lavender-200: #d9ccff;
+  --lavender-500: #6f5ad5;
+  --leaf-300: #b7d9c8;
+  --ink-700: #433a5a;
+  --ink-900: #28213a;
+  --line: #ece4d7;
+  --surface: #ffffff;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Inter, "Segoe UI", Roboto, sans-serif;
+  color: var(--ink-900);
+  background: linear-gradient(180deg, var(--cream-50), #fff);
+}
+
+#app {
+  min-height: 100vh;
+}
+
+.app-shell {
+  min-height: 100vh;
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.app-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  padding: 14px 18px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+}
+
+.brand-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--lavender-500);
+}
+
+.nav-links {
+  display: inline-flex;
+  gap: 16px;
+}
+
+.nav-links a {
+  text-decoration: none;
+  color: var(--ink-700);
+  padding: 6px 10px;
+  border-radius: 8px;
+}
+
+.nav-links a.router-link-active {
+  color: var(--ink-900);
+  background: var(--cream-100);
+}
+
+.app-main {
+  margin-top: 16px;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 18px;
+}
+
+.section-title {
+  margin: 0 0 8px;
+  font-size: 1.2rem;
+}
+
+.muted {
+  color: #6f6781;
+}
+
+.button {
+  border: 0;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--lavender-500);
+  color: #fff;
+}
+
+.button.secondary {
+  background: var(--leaf-300);
+  color: #1f3a2e;
+}

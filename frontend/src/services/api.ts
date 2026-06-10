@@ -1,0 +1,47 @@
+import type {
+  CoachRequest,
+  CoachResponse,
+  MemorySummaryResponse,
+  ParentReportResponse,
+} from "../types/ai";
+import type { PracticeSessionRecord } from "../types/session";
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8787";
+
+async function postJson<TRequest, TResponse>(
+  path: string,
+  body: TRequest
+): Promise<TResponse> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    throw new Error(`API ${path} failed: ${response.status}`);
+  }
+
+  return (await response.json()) as TResponse;
+}
+
+export async function fetchCoachFeedback(
+  payload: CoachRequest
+): Promise<CoachResponse> {
+  return postJson<CoachRequest, CoachResponse>("/coach", payload);
+}
+
+export async function fetchParentReport(
+  payload: PracticeSessionRecord
+): Promise<ParentReportResponse> {
+  return postJson<PracticeSessionRecord, ParentReportResponse>("/report", payload);
+}
+
+export async function fetchMemorySummary(
+  payload: { sessions: PracticeSessionRecord[] }
+): Promise<MemorySummaryResponse> {
+  return postJson<{ sessions: PracticeSessionRecord[] }, MemorySummaryResponse>(
+    "/memory/summary",
+    payload
+  );
+}
