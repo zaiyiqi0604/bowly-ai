@@ -4,6 +4,32 @@ import { generateMemorySummary } from "../services/aiOrchestrator.js";
 
 const memoryRouter = Router();
 
+const poseSnapshotSchema = z.object({
+  capturedAt: z.number(),
+  points: z.array(
+    z.object({
+      id: z.number(),
+      x: z.number(),
+      y: z.number(),
+      confidence: z.number(),
+    })
+  ),
+  bow: z.object({
+    startX: z.number(),
+    startY: z.number(),
+    endX: z.number(),
+    endY: z.number(),
+    confidence: z.number(),
+  }).optional(),
+  violin: z.object({
+    startX: z.number(),
+    startY: z.number(),
+    endX: z.number(),
+    endY: z.number(),
+    confidence: z.number(),
+  }).optional(),
+});
+
 const memoryRequestSchema = z.object({
   sessions: z.array(
     z.object({
@@ -37,6 +63,20 @@ const memoryRequestSchema = z.object({
         })
       ),
       coachHighlights: z.array(z.string()),
+      reviewMoments: z.array(
+        z.object({
+          id: z.string(),
+          key: z.string(),
+          title: z.string(),
+          suggestion: z.string(),
+          firstSeenAt: z.number(),
+          lastSeenAt: z.number(),
+          occurrences: z.number(),
+          totalDurationSeconds: z.number(),
+          before: poseSnapshotSchema,
+          after: poseSnapshotSchema.optional(),
+        })
+      ).optional(),
     })
   ),
 });

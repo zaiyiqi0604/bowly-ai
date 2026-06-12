@@ -1,5 +1,4 @@
 import OpenAI from "openai";
-import { zodTextFormat } from "openai/helpers/zod";
 import { z } from "zod";
 import { BOWLY_SYSTEM_PROMPT } from "../prompts/systemPrompt.js";
 import type {
@@ -12,7 +11,7 @@ import type { PracticeSessionRecord } from "../types/session.js";
 
 const CoachSchema = z.object({
   praise: z.string(),
-  correction: z.string().optional(),
+  correction: z.string().nullable(),
   encouragement: z.string(),
   scenario: z.enum([
     "good_improvement",
@@ -47,88 +46,91 @@ function createClient() {
   });
 }
 
-export async function createQwenCoachResponse(
-  payload: CoachRequest
-): Promise<CoachResponse> {
+async function createStructuredResponse<T>(
+  schema: z.ZodType<T>,
+  prompt: string
+): Promise<T> {
   const client = createClient();
-  const response = await client.responses.parse({
+  const response = await client.chat.completions.create({
     model: process.env.QWEN_MODEL ?? "qwen-plus",
-    input: [
+    messages: [
       { role: "system", content: BOWLY_SYSTEM_PROMPT },
       {
         role: "user",
-        content: `Child: ${payload.childName}
+        content: `${prompt}
+
+Return only one valid JSON object. Do not include markdown or commentary.`,
+      },
+    ],
+    response_format: { type: "json_object" },
+  });
+  const content = response.choices[0]?.message.content;
+  if (!content) {
+    throw new Error("Qwen returned an empty response.");
+  }
+  return schema.parse(JSON.parse(content));
+}
+
+export async function createQwenCoachResponse(
+  payload: CoachRequest
+): Promise<CoachResponse> {
+  const response = await createStructuredResponse(
+    CoachSchema,
+    `Create a gentle coaching response with these JSON fields:
+- praise: string
+- correction: string or null
+- encouragement: string
+- scenario: one of good_improvement, low_motivation, posture_issue, challenge_success
+
+Child: ${payload.childName}
 Challenge: ${payload.challengeTitle}
 Pitch stability: ${payload.metrics.pitchStability}
 Posture confidence: ${payload.metrics.postureConfidence}
 Rhythm stability: ${payload.metrics.rhythmStability}
-Confidence level: ${payload.metrics.confidenceLevel}`,
-      },
-    ],
-    text: {
-      format: zodTextFormat(CoachSchema, "coach_response"),
-    },
-  });
-  if (!response.output_parsed) {
-    throw new Error("Qwen coach response parsing returned empty output.");
-  }
-  return response.output_parsed;
+Confidence level: ${payload.metrics.confidenceLevel}`
+  );
+  return {
+    ...response,
+    correction: response.correction ?? undefined,
+  };
 }
 
 export async function createQwenParentReport(
   payload: PracticeSessionRecord
 ): Promise<ParentReportResponse> {
-  const client = createClient();
-  const response = await client.responses.parse({
-    model: process.env.QWEN_MODEL ?? "qwen-plus",
-    input: [
-      { role: "system", content: BOWLY_SYSTEM_PROMPT },
-      {
-        role: "user",
-        content: `Create a short parent report.
+  return createStructuredResponse(
+    ParentReportSchema,
+    `Create a short parent report with these JSON fields:
+- summary: string
+- postureInsight: string
+- motivationLevel: one of low, medium, high
+- tomorrowSuggestion: string
+- memoryInsight: string
+
 Child: ${payload.childName}
 Duration seconds: ${payload.durationSeconds}
 Pitch: ${payload.metrics.pitchStability}
 Posture: ${payload.metrics.postureConfidence}
-Confidence: ${payload.metrics.confidenceLevel}`,
-      },
-    ],
-    text: {
-      format: zodTextFormat(ParentReportSchema, "parent_report"),
-    },
-  });
-  if (!response.output_parsed) {
-    throw new Error("Qwen parent report parsing returned empty output.");
-  }
-  return response.output_parsed;
+Confidence: ${payload.metrics.confidenceLevel}`
+  );
 }
 
 export async function createQwenMemorySummary(
   sessions: PracticeSessionRecord[]
 ): Promise<MemorySummaryResponse> {
-  const client = createClient();
-  const response = await client.responses.parse({
-    model: process.env.QWEN_MODEL ?? "qwen-plus",
-    input: [
-      { role: "system", content: BOWLY_SYSTEM_PROMPT },
-      {
-        role: "user",
-        content: `Summarize trend from ${sessions.length} sessions.
+  return createStructuredResponse(
+    MemorySummarySchema,
+    `Summarize the practice trend with these JSON fields:
+- summary: string
+- trend: string
+
+Number of sessions: ${sessions.length}
 Sessions snapshot: ${JSON.stringify(
-          sessions.slice(-5).map((session) => ({
-            durationSeconds: session.durationSeconds,
-            confidenceLevel: session.metrics.confidenceLevel,
-            postureConfidence: session.metrics.postureConfidence,
-          }))
-        )}`,
-      },
-    ],
-    text: {
-      format: zodTextFormat(MemorySummarySchema, "memory_summary"),
-    },
-  });
-  if (!response.output_parsed) {
-    throw new Error("Qwen memory summary parsing returned empty output.");
-  }
-  return response.output_parsed;
+      sessions.slice(-5).map((session) => ({
+        durationSeconds: session.durationSeconds,
+        confidenceLevel: session.metrics.confidenceLevel,
+        postureConfidence: session.metrics.postureConfidence,
+      }))
+    )}`
+  );
 }

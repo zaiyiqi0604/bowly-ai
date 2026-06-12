@@ -1,4 +1,5 @@
 import type {
+  BackendHealthResponse,
   CoachRequest,
   CoachResponse,
   MemorySummaryResponse,
@@ -6,7 +7,17 @@ import type {
 } from "../types/ai";
 import type { PracticeSessionRecord } from "../types/session";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8787";
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ??
+  (import.meta.env.PROD ? "https://api.bowly.io" : "http://localhost:8787");
+
+async function getJson<TResponse>(path: string): Promise<TResponse> {
+  const response = await fetch(`${API_BASE_URL}${path}`);
+  if (!response.ok) {
+    throw new Error(`API ${path} failed: ${response.status}`);
+  }
+  return (await response.json()) as TResponse;
+}
 
 async function postJson<TRequest, TResponse>(
   path: string,
@@ -44,4 +55,8 @@ export async function fetchMemorySummary(
     "/memory/summary",
     payload
   );
+}
+
+export async function fetchBackendHealth(): Promise<BackendHealthResponse> {
+  return getJson<BackendHealthResponse>("/health");
 }

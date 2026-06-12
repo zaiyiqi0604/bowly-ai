@@ -32,3 +32,18 @@ export interface MemorySummaryResponse {
   summary: string;
   trend: string;
 }
+
+export interface AiRuntimeStatus {
+  mode: "mock" | "live";
+  provider: "mock" | "qwen" | "mock-fallback";
+  keyConfigured: boolean;
+  model: string;
+  lastRequestAt?: number;
+  lastError?: string;
+}
+
+export interface BackendHealthResponse {
+  ok: boolean;
+  service: string;
+  ai: AiRuntimeStatus;
+}

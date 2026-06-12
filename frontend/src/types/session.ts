@@ -28,6 +28,41 @@ export interface PracticeMetrics {
   confidenceLevel: number;
 }
 
+export interface PoseSnapshotPoint {
+  id: number;
+  x: number;
+  y: number;
+  confidence: number;
+}
+
+export interface PoseSnapshotLine {
+  startX: number;
+  startY: number;
+  endX: number;
+  endY: number;
+  confidence: number;
+}
+
+export interface AnonymousPoseSnapshot {
+  capturedAt: number;
+  points: PoseSnapshotPoint[];
+  bow?: PoseSnapshotLine;
+  violin?: PoseSnapshotLine;
+}
+
+export interface PracticeReviewMoment {
+  id: string;
+  key: string;
+  title: string;
+  suggestion: string;
+  firstSeenAt: number;
+  lastSeenAt: number;
+  occurrences: number;
+  totalDurationSeconds: number;
+  before: AnonymousPoseSnapshot;
+  after?: AnonymousPoseSnapshot;
+}
+
 export interface PracticeSessionRecord {
   id: string;
   startedAt: number;
@@ -38,4 +73,5 @@ export interface PracticeSessionRecord {
   challenge: PracticeChallenge;
   timeline: TimelineEvent[];
   coachHighlights: string[];
+  reviewMoments?: PracticeReviewMoment[];
 }

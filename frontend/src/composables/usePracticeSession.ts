@@ -1,18 +1,29 @@
-import { computed, ref } from "vue";
+import { computed, onBeforeUnmount, ref } from "vue";
 import { usePracticeStore } from "../stores/practice";
 import { useMemoryStore } from "../stores/memory";
 import { fetchCoachFeedback } from "../services/api";
-import type { PracticeSessionRecord } from "../types/session";
+import type {
+  PracticeReviewMoment,
+  PracticeSessionRecord,
+} from "../types/session";
 
 export function usePracticeSession() {
   const practiceStore = usePracticeStore();
   const memoryStore = useMemoryStore();
   const coachMessage = ref("Welcome back. Let's try one small challenge today.");
   const loadingCoach = ref(false);
+  const clockTick = ref(Date.now());
+  const clockTimer = window.setInterval(() => {
+    clockTick.value = Date.now();
+  }, 1000);
 
   const durationSeconds = computed(() => {
     if (!practiceStore.isSessionActive) return 0;
-    return Math.max(0, Math.floor((Date.now() - practiceStore.sessionStartedAt) / 1000));
+    return Math.max(0, Math.floor((clockTick.value - practiceStore.sessionStartedAt) / 1000));
+  });
+
+  onBeforeUnmount(() => {
+    window.clearInterval(clockTimer);
   });
 
   async function requestCoachMessage() {
@@ -46,7 +57,7 @@ export function usePracticeSession() {
     practiceStore.addTimeline("coach", "Session started with calm focus.");
   }
 
-  function endSession() {
+  function endSession(reviewMoments: PracticeReviewMoment[] = []) {
     const now = Date.now();
     practiceStore.endSession();
     const record: PracticeSessionRecord = {
@@ -62,6 +73,7 @@ export function usePracticeSession() {
         .filter((event) => event.type === "coach")
         .map((event) => event.message)
         .slice(0, 3),
+      reviewMoments,
     };
     memoryStore.saveSession(record);
   }

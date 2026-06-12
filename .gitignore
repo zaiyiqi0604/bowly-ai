@@ -1,4 +1,5 @@
 node_modules/
+.npm-cache/
 frontend/node_modules/
 backend/node_modules/
 dist/
@@ -7,3 +8,13 @@ backend/dist/
 .env
 .DS_Store
 *.log
+deploy/alibaba-cloud/letsencrypt/
+deploy/alibaba-cloud/ssl-upload/
+deploy/alibaba-cloud/ssl-upload-rsa/
+deploy/alibaba-cloud/certbot-work/
+deploy/alibaba-cloud/certbot-rsa-work/
+deploy/alibaba-cloud/function-compute-package/
+deploy/alibaba-cloud/bowly-backend-function-compute.zip
+deploy/alibaba-cloud/container-test-result.json
+deploy/alibaba-cloud/container-test-error.txt
+deploy/alibaba-cloud/container-build.log

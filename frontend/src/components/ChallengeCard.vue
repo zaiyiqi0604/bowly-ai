@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ArrowTrendingUpIcon } from "@heroicons/vue/24/outline";
 import type { PracticeChallenge } from "../types/session";
 
 defineProps<{
@@ -7,46 +8,24 @@ defineProps<{
 </script>
 
 <template>
-  <section class="card">
-    <h3 class="section-title">{{ challenge.title }}</h3>
-    <p class="muted">{{ challenge.description }}</p>
-    <div class="progress-row">
-      <div class="track">
+  <section class="p-6 sm:p-8">
+    <h3 class="flex items-center gap-3 text-lg font-semibold text-orange-300">
+      <ArrowTrendingUpIcon class="h-6 w-6" />
+      Today's Challenge
+    </h3>
+    <p class="mt-7 text-base font-medium text-white/90">{{ challenge.title }}</p>
+    <p class="mt-2 text-sm leading-6 text-white/50">{{ challenge.description }}</p>
+    <div class="mt-6 flex items-center gap-4">
+      <div class="h-2 flex-1 overflow-hidden rounded-full bg-white/15">
         <div
-          class="fill"
-          :style="{ width: `${Math.round((challenge.progress / challenge.target) * 100)}%` }"
+          class="h-full rounded-full bg-orange-300 transition-all duration-500"
+          :style="{ width: `${Math.min(100, Math.round((challenge.progress / challenge.target) * 100))}%` }"
         ></div>
       </div>
-      <span>{{ challenge.progress }}/{{ challenge.target }}</span>
+      <span class="text-lg font-semibold text-orange-200">{{ challenge.progress }} / {{ challenge.target }}</span>
     </div>
-    <p v-if="challenge.completed" class="done">Great work today. Challenge complete.</p>
+    <p v-if="challenge.completed" class="mt-4 text-sm font-semibold text-lime-300">
+      Great work today. Challenge complete.
+    </p>
   </section>
 </template>
-
-<style scoped>
-.progress-row {
-  margin-top: 10px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.track {
-  flex: 1;
-  height: 10px;
-  border-radius: 999px;
-  overflow: hidden;
-  background: #efe7db;
-}
-
-.fill {
-  height: 100%;
-  background: linear-gradient(90deg, #ffd16c, #6f5ad5);
-}
-
-.done {
-  margin-top: 8px;
-  color: #1f6a43;
-  font-weight: 600;
-}
-</style>

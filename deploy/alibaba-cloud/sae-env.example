@@ -1,0 +1,8 @@
+PORT=8787
+APP_VERSION=hackathon-2026
+DEPLOYMENT_PLATFORM=alibaba-cloud-sae
+ALIBABA_CLOUD_REGION=ap-southeast-1
+USE_MOCK_AI=false
+QWEN_API_KEY=set-in-sae-secret-environment
+QWEN_BASE_URL=https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1
+QWEN_MODEL=qwen3.7-plus

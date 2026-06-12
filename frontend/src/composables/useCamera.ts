@@ -6,17 +6,32 @@ export function useCamera() {
   const errorMessage = ref<string | null>(null);
 
   async function startCamera() {
+    permissionState.value = "idle";
+    errorMessage.value = null;
     try {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        throw new Error("Camera API is unavailable in this browser.");
+      }
       stream.value = await navigator.mediaDevices.getUserMedia({
-        video: true,
+        video: {
+          width: { ideal: 640, max: 640 },
+          height: { ideal: 480, max: 480 },
+          frameRate: { ideal: 15, max: 20 },
+          facingMode: "user",
+        },
         audio: false,
       });
       permissionState.value = "granted";
       errorMessage.value = null;
     } catch (error) {
       permissionState.value = "denied";
-      errorMessage.value = "Camera access is needed for posture observation.";
-      console.error(error);
+      const errorName = error instanceof DOMException ? error.name : "";
+      errorMessage.value = errorName === "NotAllowedError"
+        ? "Camera permission is blocked. Allow camera access for 127.0.0.1, then retry."
+        : error instanceof Error
+          ? error.message
+          : "Camera access is needed for posture observation.";
+      if (errorName !== "NotAllowedError") console.error(error);
     }
   }
 

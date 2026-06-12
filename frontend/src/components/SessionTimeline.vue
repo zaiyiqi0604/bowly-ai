@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ClockIcon } from "@heroicons/vue/24/outline";
 import type { TimelineEvent } from "../types/session";
 
 defineProps<{
@@ -11,54 +12,34 @@ function formatTime(timestamp: number) {
     minute: "2-digit",
   });
 }
+
+function eventColor(type: TimelineEvent["type"]) {
+  if (type === "challenge") return "bg-orange-300";
+  if (type === "posture") return "bg-bowly-400";
+  return "bg-lime-300";
+}
 </script>
 
 <template>
-  <section class="card">
-    <h3 class="section-title">Session Timeline</h3>
-    <ul class="timeline-list">
-      <li v-for="event in events" :key="event.id">
-        <span class="time">{{ formatTime(event.timestamp) }}</span>
-        <span class="type">{{ event.type }}</span>
-        <span class="message">{{ event.message }}</span>
+  <section class="p-6 sm:p-8">
+    <h3 class="flex items-center gap-3 text-lg font-semibold text-lime-300">
+      <ClockIcon class="h-6 w-6" />
+      Session Timeline
+    </h3>
+    <ul class="mt-7 space-y-0">
+      <li v-for="(event, index) in events" :key="event.id" class="relative grid grid-cols-[18px_64px_1fr] gap-3 pb-6">
+        <span v-if="index < events.length - 1" class="absolute left-[8px] top-4 h-full w-px bg-white/20"></span>
+        <span class="relative mt-1 h-4 w-4 rounded-full border-2 border-stage-800" :class="eventColor(event.type)"></span>
+        <span class="text-sm text-white/45">{{ formatTime(event.timestamp) }}</span>
+        <span>
+          <span class="block text-sm capitalize text-white/85">{{ event.type }}</span>
+          <span class="mt-1 block text-xs leading-5 text-white/40">{{ event.message }}</span>
+        </span>
       </li>
-      <li v-if="events.length === 0" class="muted">
-        Timeline will appear when practice starts.
+      <li v-if="events.length === 0" class="grid grid-cols-[18px_1fr] gap-3">
+        <span class="mt-1 h-4 w-4 rounded-full border-2 border-white/25"></span>
+        <span class="text-sm text-white/45">Timeline will appear when practice starts.</span>
       </li>
     </ul>
   </section>
 </template>
-
-<style scoped>
-.timeline-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 8px;
-}
-
-li {
-  display: grid;
-  grid-template-columns: 70px 74px 1fr;
-  gap: 8px;
-  align-items: center;
-  font-size: 0.9rem;
-  padding: 8px 10px;
-  border-radius: 10px;
-  background: #fff8ec;
-}
-
-.time {
-  color: #6f6781;
-}
-
-.type {
-  text-transform: capitalize;
-  color: #5948ad;
-}
-
-.message {
-  color: #302842;
-}
-</style>
