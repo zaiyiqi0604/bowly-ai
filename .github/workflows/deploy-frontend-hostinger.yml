@@ -76,7 +76,7 @@ jobs:
           lftp <<LFTP_COMMANDS
           set cmd:fail-exit yes
           set dns:order inet
-          set net:max-retries 2
+          set net:max-retries 1
           set net:timeout 15
           set net:reconnect-interval-base 5
           set ftp:passive-mode true
@@ -86,10 +86,17 @@ jobs:
           # TLS certificate is issued to an internal hostname.
           set ssl:verify-certificate false
           open -p "$FTP_PORT" -u "$FTP_USERNAME","$FTP_PASSWORD" "ftp://$FTP_HOST"
+          quote PWD
+          echo "FTP control connection and login succeeded."
+          echo "Checking remote deployment directory..."
+          cd "$FTP_REMOTE_DIR"
+          quote PWD
+          echo "Remote directory selected. Testing passive data connection..."
           cls -1
+          echo "Remote listing succeeded. Starting upload..."
           mirror --reverse --delete --verbose \
             --exclude-glob .well-known/** \
             --exclude-glob .ftpquota \
-            frontend/dist "$FTP_REMOTE_DIR"
+            frontend/dist .
           bye
           LFTP_COMMANDS

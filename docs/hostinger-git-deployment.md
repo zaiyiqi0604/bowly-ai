@@ -151,3 +151,7 @@ attempted to upload files. Check:
    port.
 3. The FTP account is active and can connect from an external FTP client.
 4. Hostinger is not restricting FTP access by IP address.
+
+The deployment log now reports separate milestones for login, remote-directory
+access, passive data-channel listing, and upload. The last displayed milestone
+identifies which Hostinger configuration needs attention.
