@@ -30,7 +30,7 @@ export function usePracticeSession() {
   async function requestCoachMessage(
     reviewMoments: PracticeReviewMoment[] = [],
     activity: PracticeActivityStats,
-  ) {
+  ): Promise<string> {
     loadingCoach.value = true;
     try {
       const response = await fetchCoachFeedback({
@@ -57,12 +57,14 @@ export function usePracticeSession() {
         })),
       });
 
-      if (response.action === "stay_quiet") return;
+      if (response.action === "stay_quiet") return "";
       coachMessage.value = response.message;
       practiceStore.addTimeline("coach", response.message);
+      return response.message;
     } catch (error) {
       console.error(error);
       coachMessage.value = "Take your time. Continue when you are ready.";
+      return "";
     } finally {
       loadingCoach.value = false;
     }

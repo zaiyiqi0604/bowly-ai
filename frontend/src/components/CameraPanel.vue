@@ -26,6 +26,8 @@ const {
   isPlaying,
   microFeedback,
   cameraRequestId,
+  hideAmbientStatus,
+  cameraEnabled,
 } = defineProps<{
   showGuideOverlay: boolean;
   enableDynamicTracking: boolean;
@@ -33,6 +35,8 @@ const {
   isPlaying: boolean;
   microFeedback: string;
   cameraRequestId: number;
+  hideAmbientStatus?: boolean;
+  cameraEnabled: boolean;
 }>();
 const emit = defineEmits<{
   observation: [payload: {
@@ -52,7 +56,7 @@ const emit = defineEmits<{
   }];
 }>();
 
-const { stream, permissionState, errorMessage, startCamera } = useCamera();
+const { stream, permissionState, errorMessage, startCamera, stopCamera } = useCamera();
 const videoRef = ref<HTMLVideoElement | null>(null);
 const canvasRef = ref<HTMLCanvasElement | null>(null);
 const detectorReady = ref(false);
@@ -121,8 +125,19 @@ processingCanvas.height = PROCESSING_HEIGHT;
 watch(
   () => cameraRequestId,
   (requestId, previousRequestId) => {
-    if (requestId > previousRequestId) void startCamera();
+    if (cameraEnabled && requestId > previousRequestId) void startCamera();
   }
+);
+
+watch(
+  () => cameraEnabled,
+  (enabled) => {
+    if (enabled) return;
+    stopCamera();
+    if (videoRef.value) videoRef.value.srcObject = null;
+    window.clearTimeout(trackingTimer);
+    stopRenderLoop();
+  },
 );
 
 watch(
@@ -703,6 +718,7 @@ onBeforeUnmount(() => {
           </div>
 
           <button
+            v-if="!hideAmbientStatus"
             type="button"
             class="pointer-events-auto absolute bottom-40 left-1/2 flex min-h-9 w-[min(72%,32rem)] -translate-x-1/2 items-center gap-2.5 rounded-full border border-white/10 bg-stage-950/55 px-3.5 py-2 text-left text-xs text-white/70 shadow-lg backdrop-blur-md transition hover:bg-stage-950/70"
             :aria-expanded="showStatusDetail"
@@ -724,7 +740,7 @@ onBeforeUnmount(() => {
           </button>
 
           <div
-            v-if="showStatusDetail"
+            v-if="showStatusDetail && !hideAmbientStatus"
             class="pointer-events-auto absolute bottom-[12rem] left-1/2 w-[min(72%,32rem)] -translate-x-1/2 rounded-2xl border border-white/10 bg-stage-950/85 p-3 text-white shadow-xl backdrop-blur-xl"
           >
             <div class="flex items-start gap-3">
@@ -754,7 +770,10 @@ onBeforeUnmount(() => {
             <span class="absolute bottom-0 left-0 h-7 w-7 rounded-bl-xl border-b border-l border-lime-200/70"></span>
             <span class="absolute bottom-0 right-0 h-7 w-7 rounded-br-xl border-b border-r border-lime-200/70"></span>
           </div>
-          <div class="absolute bottom-40 left-1/2 flex h-9 w-[min(72%,32rem)] -translate-x-1/2 items-center gap-2 rounded-full border border-white/10 bg-stage-950/55 px-3.5 text-xs text-white/60 backdrop-blur-md">
+          <div
+            v-if="!hideAmbientStatus"
+            class="absolute bottom-40 left-1/2 flex h-9 w-[min(72%,32rem)] -translate-x-1/2 items-center gap-2 rounded-full border border-white/10 bg-stage-950/55 px-3.5 text-xs text-white/60 backdrop-blur-md"
+          >
             <span class="h-2 w-2 rounded-full bg-lime-300/70"></span>
             Keep your upper body and both hands in view
           </div>
@@ -764,12 +783,18 @@ onBeforeUnmount(() => {
     <div v-if="permissionState !== 'granted'" class="absolute inset-0 grid place-items-center p-8">
       <div class="max-w-md text-center">
         <div class="mx-auto grid h-20 w-20 place-items-center rounded-full border border-white/10 bg-white/5 text-3xl text-bowly-300">B</div>
-        <h2 class="mt-6 text-2xl font-semibold">Camera Observation</h2>
+        <h2 class="mt-6 text-2xl font-semibold">
+          {{ cameraEnabled ? "Camera Observation" : "Ready when you are" }}
+        </h2>
         <p class="mt-3 text-sm leading-6 text-white/45">
-          {{ errorMessage ?? "Waiting for camera permission so Bowly can observe posture and violin balance." }}
+          {{
+            cameraEnabled
+              ? errorMessage ?? "Waiting for camera permission so Bowly can observe posture and violin balance."
+              : "Camera and microphone stay off until you start practice."
+          }}
         </p>
         <button
-          v-if="permissionState === 'denied'"
+          v-if="cameraEnabled && permissionState === 'denied'"
           type="button"
           class="primary-button mt-6 pointer-events-auto"
           @click="startCamera"

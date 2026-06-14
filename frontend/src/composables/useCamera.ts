@@ -38,6 +38,8 @@ export function useCamera() {
   function stopCamera() {
     stream.value?.getTracks().forEach((track) => track.stop());
     stream.value = null;
+    permissionState.value = "idle";
+    errorMessage.value = null;
   }
 
   onBeforeUnmount(stopCamera);

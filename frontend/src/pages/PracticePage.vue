@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { useRouter } from "vue-router";
 import {
   AdjustmentsHorizontalIcon,
   CameraIcon,
@@ -25,6 +26,7 @@ import type {
 } from "../types/session";
 
 const practiceStore = usePracticeStore();
+const router = useRouter();
 const {
   signalActive,
   hasReliablePitch,
@@ -61,6 +63,7 @@ const allowAudioOnly = ref(false);
 const allowStartAnyway = ref(false);
 const audioOnlyMode = ref(false);
 const cameraRequestId = ref(0);
+const cameraEnabled = ref(false);
 const cameraStatus = ref<{
   permission: "idle" | "granted" | "denied";
   trackingReady: boolean;
@@ -150,6 +153,7 @@ onBeforeUnmount(() => {
   clearInterval(flowMonitorTimer);
   clearTimeout(feedbackHideTimer);
   stopMicrophone();
+  cameraEnabled.value = false;
   if (practiceStore.isSessionActive) {
     finishCurrentPhrase();
     closeActiveObservations();
@@ -203,6 +207,7 @@ async function startPractice() {
 
   await startMicrophone();
   if (microphonePermission.value !== "granted") {
+    cameraEnabled.value = false;
     startState.value = "blocked";
     startIssue.value = "Microphone access is needed to listen to the practice.";
     return;
@@ -210,6 +215,8 @@ async function startPractice() {
   if (calibrationState.value !== "ready") {
     const calibrated = await calibrateNoise();
     if (!calibrated) {
+      cameraEnabled.value = false;
+      stopMicrophone();
       startState.value = "blocked";
       startIssue.value = "The microphone could not measure the room sound.";
       return;
@@ -218,17 +225,27 @@ async function startPractice() {
 
   await waitForCameraCheck();
   if (cameraStatus.value.permission === "denied") {
+    cameraEnabled.value = false;
     startState.value = "blocked";
     startIssue.value = "Camera access is unavailable. You can continue with audio only.";
     allowAudioOnly.value = true;
     return;
   }
   if (cameraStatus.value.framing !== "good") {
+    if (window.matchMedia("(max-width: 767px)").matches) {
+      startState.value = "idle";
+      startIssue.value = "";
+      allowStartAnyway.value = false;
+      beginSession();
+      showMicroFeedback("Partial view active. Only clearly visible movement will be assessed.");
+      return;
+    }
     startState.value = "blocked";
     startIssue.value =
       cameraStatus.value.message ||
       "Keep your upper body and both hands inside the camera view.";
     allowStartAnyway.value = true;
+    stopMicrophone();
     return;
   }
 
@@ -263,6 +280,9 @@ function stopPractice() {
   updateActivityPercentages();
   practiceStore.setPitchStability(activity.value.stablePitchPercent);
   endSession(reviewMoments.value, activity.value);
+  stopMicrophone();
+  cameraEnabled.value = false;
+  void router.push("/report");
 }
 
 function toggleDynamicTracking() {
@@ -275,6 +295,7 @@ watch(isPlaying, (playing) => {
 });
 
 function prepareCamera() {
+  cameraEnabled.value = true;
   showGuideOverlay.value = true;
   enableDynamicTracking.value = true;
   cameraRequestId.value += 1;
@@ -402,8 +423,24 @@ function monitorPracticeFlow() {
     deliverPendingObservation();
     if (now - lastCoachRequestAt >= 15000) {
       lastCoachRequestAt = now;
-      void requestCoachMessage(reviewMoments.value, activity.value);
+      void requestPauseFeedback();
     }
+  }
+}
+
+async function requestPauseFeedback() {
+  const message = await requestCoachMessage(reviewMoments.value, activity.value);
+  if (message && !isPlaying.value && practiceStore.isSessionActive) {
+    showMicroFeedback(message);
+    return;
+  }
+  if (
+    !microFeedback.value &&
+    !isPlaying.value &&
+    practiceStore.isSessionActive &&
+    activity.value.phraseCount > 0
+  ) {
+    showMicroFeedback("Nice focus. Take one calm breath before the next phrase.");
   }
 }
 
@@ -450,6 +487,8 @@ function closeActiveObservations() {
             :is-playing="isPlaying"
             :micro-feedback="microFeedback"
             :camera-request-id="cameraRequestId"
+            :camera-enabled="cameraEnabled"
+            hide-ambient-status
             @observation="handleObservation"
             @status="handleCameraStatus"
           />
