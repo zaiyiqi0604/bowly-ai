@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import {
-  ArrowTrendingUpIcon,
   CheckCircleIcon,
   ClockIcon,
   EyeIcon,
-  HeartIcon,
   LightBulbIcon,
+  MusicalNoteIcon,
+  PlayCircleIcon,
 } from "@heroicons/vue/24/outline";
 import { useMemoryStore } from "../stores/memory";
 import { fetchBackendHealth, fetchParentReport } from "../services/api";
@@ -19,12 +19,31 @@ const report = ref<ParentReportResponse | null>(null);
 const aiStatus = ref<AiRuntimeStatus | null>(null);
 const errorText = ref("");
 const latestSession = computed(() => memoryStore.latestSession);
+const activity = computed(() => latestSession.value?.activity);
+const continuityInsight = computed(() => {
+  const durations = activity.value?.phraseDurationsSeconds ?? [];
+  if (durations.length < 4) return "Not enough sections for an early-to-late comparison.";
+  const midpoint = Math.ceil(durations.length / 2);
+  const average = (values: number[]) =>
+    values.reduce((sum, value) => sum + value, 0) / values.length;
+  const early = average(durations.slice(0, midpoint));
+  const later = average(durations.slice(midpoint));
+  if (later > early * 1.12) return "Later playing sections lasted longer.";
+  if (later < early * 0.88) return "Later playing sections became shorter.";
+  return "Playing-section length stayed consistent.";
+});
 const reviewMoments = computed(() =>
   [...(latestSession.value?.reviewMoments ?? [])]
+    .filter((moment) => (moment.confidence ?? 0) >= 0.8)
     .sort((a, b) => b.totalDurationSeconds - a.totalDurationSeconds)
     .slice(0, 3)
 );
 const primaryReview = computed(() => reviewMoments.value[0] ?? null);
+const fallbackSuggestion = computed(() =>
+  latestSession.value?.practiceMode === "assignment"
+    ? "Continue the same assigned section with one calm repeat."
+    : "Choose one small intention before the next free practice."
+);
 const aiStatusLabel = computed(() => {
   if (!aiStatus.value) return "AI status unavailable";
   if (aiStatus.value.provider === "qwen") return `Qwen Live · ${aiStatus.value.model}`;
@@ -76,7 +95,7 @@ onMounted(async () => {
       <div class="mt-3 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
           <h1 class="text-4xl font-semibold tracking-tight text-stage-950">Parent Practice Report</h1>
-          <p class="mt-3 text-stone-500">A calm summary of progress, confidence, and the next small step.</p>
+          <p class="mt-3 text-stone-500">A factual summary of practice activity and one useful next step.</p>
         </div>
         <div class="flex flex-col items-start gap-3 sm:items-end">
           <span
@@ -100,17 +119,35 @@ onMounted(async () => {
         <article class="light-card">
           <ClockIcon class="h-7 w-7 text-bowly-500" />
           <p class="mt-5 text-sm text-stone-500">Practice duration</p>
-          <p class="mt-1 text-3xl font-semibold">{{ Math.round(latestSession.durationSeconds / 60) }} min</p>
+          <p class="mt-1 text-3xl font-semibold">
+            {{
+              latestSession.durationSeconds < 60
+                ? "<1 min"
+                : `${Math.round(latestSession.durationSeconds / 60)} min`
+            }}
+          </p>
         </article>
         <article class="light-card">
-          <ArrowTrendingUpIcon class="h-7 w-7 text-lime-600" />
-          <p class="mt-5 text-sm text-stone-500">Progress trend</p>
-          <p class="mt-1 text-lg font-semibold">{{ memoryStore.consistencyTrend }}</p>
+          <PlayCircleIcon class="h-7 w-7 text-lime-600" />
+          <p class="mt-5 text-sm text-stone-500">Playing sections</p>
+          <p class="mt-1 text-3xl font-semibold">{{ activity?.phraseCount ?? "—" }}</p>
+          <p class="mt-1 text-xs text-stone-400">
+            Longest {{ Math.round(activity?.longestContinuousSeconds ?? 0) }} sec
+          </p>
         </article>
         <article class="light-card">
-          <HeartIcon class="h-7 w-7 text-orange-500" />
-          <p class="mt-5 text-sm text-stone-500">Motivation</p>
-          <p class="mt-1 text-3xl font-semibold capitalize">{{ report?.motivationLevel ?? "medium" }}</p>
+          <MusicalNoteIcon class="h-7 w-7 text-orange-500" />
+          <p class="mt-5 text-sm text-stone-500">Pitch near centre</p>
+          <p class="mt-1 text-3xl font-semibold">
+            {{ (activity?.pitchedSeconds ?? 0) >= 12 ? `${activity?.inTunePercent}%` : "—" }}
+          </p>
+          <p class="mt-1 text-xs text-stone-400">
+            {{
+              (activity?.pitchedSeconds ?? 0) >= 12
+                ? "Only while a clear pitch was detected"
+                : "Not enough clear pitch data"
+            }}
+          </p>
         </article>
 
         <article class="light-card md:col-span-2">
@@ -120,10 +157,10 @@ onMounted(async () => {
           </p>
           <div class="mt-7 grid gap-4 sm:grid-cols-2">
             <div class="rounded-xl bg-stone-50 p-4 text-sm leading-6 text-stone-600">
-              {{ report?.postureInsight ?? "Posture confidence improves with slow starts." }}
+              {{ report?.postureInsight ?? "No persistent camera-view issue was recorded." }}
             </div>
             <div class="rounded-xl bg-stone-50 p-4 text-sm leading-6 text-stone-600">
-              {{ report?.memoryInsight ?? "Consistency is growing week by week." }}
+              {{ report?.memoryInsight ?? continuityInsight }}
             </div>
           </div>
         </article>
@@ -131,7 +168,7 @@ onMounted(async () => {
           <LightBulbIcon class="h-7 w-7 text-orange-300" />
           <p class="mt-5 text-sm text-white/45">Tomorrow's suggestion</p>
           <p class="mt-3 text-lg leading-7">
-            {{ report?.tomorrowSuggestion ?? "Begin with 3 slow bows." }}
+            {{ report?.tomorrowSuggestion ?? fallbackSuggestion }}
           </p>
         </article>
 
@@ -140,10 +177,10 @@ onMounted(async () => {
             <div>
               <p class="section-kicker">Practice reflections</p>
               <h2 class="mt-2 text-2xl font-semibold text-stage-950">
-                Key moments without saving camera images
+                Reliable camera-view moments
               </h2>
               <p class="mt-2 max-w-2xl text-sm leading-6 text-stone-500">
-                These are anonymous joint diagrams. Faces, clothing, room details, and the original video are not stored.
+                Only persistent, high-confidence visibility events are shown. Original video is not stored.
               </p>
             </div>
             <span class="inline-flex items-center gap-2 text-sm text-lime-700">
@@ -172,14 +209,14 @@ onMounted(async () => {
               <div class="mt-5 grid gap-4 sm:grid-cols-2">
                 <div>
                   <p class="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-bowly-600">
-                    Moment to notice
+                    Camera view to notice
                   </p>
                   <PoseSnapshot :snapshot="moment.before" tone="before" />
                 </div>
                 <div>
                   <p class="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-lime-700">
                     <CheckCircleIcon class="h-4 w-4" />
-                    {{ moment.after ? "Improved later" : "Next practice target" }}
+                    {{ moment.after ? "View restored later" : "Setup for next time" }}
                   </p>
                   <PoseSnapshot
                     v-if="moment.after"
@@ -190,7 +227,7 @@ onMounted(async () => {
                     v-else
                     class="grid h-44 place-items-center rounded-xl border border-dashed border-lime-300 bg-lime-50 px-6 text-center text-sm leading-6 text-lime-800"
                   >
-                    Try this again next session. Bowly will add the comparison when the movement becomes clearer.
+                    Adjust the camera before the next session so both hands remain visible.
                   </div>
                 </div>
               </div>
@@ -198,9 +235,9 @@ onMounted(async () => {
           </div>
 
           <div v-else class="mt-7 rounded-2xl bg-lime-50 p-6 text-lime-900">
-            <p class="font-semibold">No persistent posture issue was recorded.</p>
+            <p class="font-semibold">No persistent camera-view issue was recorded.</p>
             <p class="mt-2 text-sm leading-6 text-lime-800">
-              Bowly only saves a review moment when an adjustment lasts long enough to be useful.
+              Bowly only saves a moment when the visibility issue lasts long enough and detection is confident.
             </p>
           </div>
         </section>
@@ -215,13 +252,13 @@ onMounted(async () => {
           <p class="mt-3 text-2xl font-semibold">
             {{
               primaryReview.after
-                ? "You kept going and found a clearer movement."
-                : "You found one useful idea for next time."
+                ? "You kept going after the camera view became clear."
+                : "You found one useful setup idea for next time."
             }}
           </p>
           <p class="mt-3 max-w-3xl text-sm leading-7 text-white/75">
-            Today you worked on {{ primaryReview.title.toLowerCase() }}.
-            Next time, try one slow phrase with this small idea:
+            Bowly noticed {{ primaryReview.title.toLowerCase() }}.
+            Before the next phrase:
             {{ primaryReview.suggestion }}
           </p>
         </section>

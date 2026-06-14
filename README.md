@@ -21,6 +21,9 @@ See the [architecture](docs/architecture.md) and
 Alibaba Cloud deployment instructions:
 [deploy/alibaba-cloud/README.md](deploy/alibaba-cloud/README.md).
 
+Hostinger frontend Git deployment:
+[docs/hostinger-git-deployment.md](docs/hostinger-git-deployment.md).
+
 ## Project Structure
 
 ```txt

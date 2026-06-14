@@ -1,7 +1,17 @@
 export type PracticeChallengeType =
   | "straight-bow"
   | "long-note"
-  | "calm-posture";
+  | "calm-posture"
+  | "teacher-assignment"
+  | "free-practice";
+
+export type PracticeMode = "assignment" | "free";
+
+export type FreePracticeIntention =
+  | "just-play"
+  | "warm-up"
+  | "scales"
+  | "teacher-work";
 
 export interface PracticeChallenge {
   id: string;
@@ -59,8 +69,24 @@ export interface PracticeReviewMoment {
   lastSeenAt: number;
   occurrences: number;
   totalDurationSeconds: number;
+  confidence?: number;
+  category?: "framing" | "posture";
   before: AnonymousPoseSnapshot;
   after?: AnonymousPoseSnapshot;
+}
+
+export interface PracticeActivityStats {
+  phraseCount: number;
+  phraseDurationsSeconds: number[];
+  pauseCount: number;
+  totalPlayingSeconds: number;
+  longestContinuousSeconds: number;
+  pitchedSeconds: number;
+  inTuneSeconds: number;
+  stablePitchSeconds: number;
+  inTunePercent: number;
+  stablePitchPercent: number;
+  pitchDataQuality: "insufficient" | "limited" | "good";
 }
 
 export interface PracticeSessionRecord {
@@ -69,9 +95,11 @@ export interface PracticeSessionRecord {
   endedAt: number;
   durationSeconds: number;
   childName: string;
+  practiceMode?: PracticeMode;
   metrics: PracticeMetrics;
   challenge: PracticeChallenge;
   timeline: TimelineEvent[];
   coachHighlights: string[];
   reviewMoments?: PracticeReviewMoment[];
+  activity?: PracticeActivityStats;
 }

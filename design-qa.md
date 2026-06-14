@@ -1,20 +1,36 @@
 # Design QA
 
-Reference: Focus Stage concept selected in the Product Design workflow.
-Viewport checked: 1440 x 1024 desktop and 390 x 844 mobile.
+Source visual truth: Steve Jobs direction, concept 3 generated in this thread.
+Target: `http://127.0.0.1:5173/practice`
+Viewport: mobile portrait
+State: remembered task and first-use empty state
 
-## Comparison
+**Implemented**
 
-- Layout: passed. The desktop implementation preserves the dominant camera stage, compact floating controls, bottom pitch meter, persistent session actions, and right-side coaching rail.
-- Visual system: passed. Dark plum stage surfaces, restrained violet actions, orange challenge status, and lime session feedback match the selected direction.
-- Typography and spacing: passed. Hierarchy remains readable without nested-card clutter, and the right rail keeps consistent section rhythm.
-- Responsiveness: passed. The rail stacks below the practice stage on narrow screens and navigation becomes icon-led.
-- Interaction: passed. Overlay toggles, tracking toggle, Start Session, End Session, live pitch display, and timeline state remain functional.
-- Console: passed. No browser console errors or warnings during the checked practice flow.
-- Camera state: passed with permission-denied fallback. Camera permission was not granted during QA, and the designed fallback state rendered correctly.
+- Removed the visible Teacher Task / Free Practice mode selection.
+- Added one primary Start Practice action.
+- Added a remembered-task state with optional score thumbnail.
+- Added Change today's practice and Just play secondary actions.
+- Added a compact task editor with text and camera/photo input.
+- Persisted the task and compressed score image in local browser storage.
+- Preserved the internal assignment/free state required by reports and AI requests.
 
-## Remaining P3
+**Verification**
 
-- The live camera composition depends on the user's physical framing and lighting, so exact visual balance varies at runtime.
+- TypeScript and production build: passed.
+- Diff whitespace validation: passed.
+- Browser visual and interaction comparison: blocked because the installed in-app Browser plugin is missing its required `scripts/browser-client.mjs` runtime.
 
-final result: passed
+**Required Fidelity Surfaces**
+
+- Typography: implemented with the existing Bowly type scale and tokens.
+- Spacing and hierarchy: implemented around one primary action and two quiet secondary actions.
+- Colors: existing Bowly violet, stage surfaces, and muted text tokens retained.
+- Assets: existing Heroicons and an uploaded score thumbnail are used; no placeholder artwork was introduced.
+- Copy: mode terminology is removed from the child-facing start state.
+
+**Remaining Blocker**
+
+- A rendered browser capture is required to compare the implementation against concept 3 at the same mobile viewport.
+
+final result: blocked

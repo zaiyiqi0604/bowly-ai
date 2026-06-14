@@ -1,23 +1,31 @@
 export interface CoachRequest {
   childName: string;
-  metrics: {
-    pitchStability: number;
-    postureConfidence: number;
-    rhythmStability: number;
-    confidenceLevel: number;
+  practiceMode: "assignment" | "free";
+  practiceTitle: string;
+  pitchStability: number;
+  naturalPause: boolean;
+  activity: {
+    phraseCount: number;
+    totalPlayingSeconds: number;
+    longestContinuousSeconds: number;
+    inTunePercent: number;
+    stablePitchPercent: number;
+    pitchDataQuality: "insufficient" | "limited" | "good";
   };
-  challengeTitle: string;
+  observations: Array<{
+    type: string;
+    title: string;
+    durationSeconds: number;
+    occurrences: number;
+    confidence: number;
+    category: "framing" | "posture";
+  }>;
 }
 
 export interface CoachResponse {
-  praise: string;
-  correction?: string;
-  encouragement: string;
-  scenario:
-    | "good_improvement"
-    | "low_motivation"
-    | "posture_issue"
-    | "challenge_success";
+  action: "stay_quiet" | "micro_feedback";
+  message: string;
+  focus: "effort" | "pitch" | "posture" | "continuity";
 }
 
 export interface ParentReportResponse {

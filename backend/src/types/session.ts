@@ -54,8 +54,24 @@ export interface PracticeReviewMoment {
   lastSeenAt: number;
   occurrences: number;
   totalDurationSeconds: number;
+  confidence?: number;
+  category?: "framing" | "posture";
   before: AnonymousPoseSnapshot;
   after?: AnonymousPoseSnapshot;
+}
+
+export interface PracticeActivityStats {
+  phraseCount: number;
+  phraseDurationsSeconds: number[];
+  pauseCount: number;
+  totalPlayingSeconds: number;
+  longestContinuousSeconds: number;
+  pitchedSeconds: number;
+  inTuneSeconds: number;
+  stablePitchSeconds: number;
+  inTunePercent: number;
+  stablePitchPercent: number;
+  pitchDataQuality: "insufficient" | "limited" | "good";
 }
 
 export interface PracticeSessionRecord {
@@ -64,9 +80,11 @@ export interface PracticeSessionRecord {
   endedAt: number;
   durationSeconds: number;
   childName: string;
+  practiceMode?: "assignment" | "free";
   metrics: PracticeMetrics;
   challenge: PracticeChallenge;
   timeline: TimelineEvent[];
   coachHighlights: string[];
   reviewMoments?: PracticeReviewMoment[];
+  activity?: PracticeActivityStats;
 }

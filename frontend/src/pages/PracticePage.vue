@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import {
+  AdjustmentsHorizontalIcon,
   CameraIcon,
-  PlayIcon,
+  ChevronUpIcon,
   StopIcon,
   ViewfinderCircleIcon,
 } from "@heroicons/vue/24/outline";
@@ -10,85 +11,244 @@ import CameraPanel from "../components/CameraPanel.vue";
 import PracticeCoachPanel from "../components/PracticeCoachPanel.vue";
 import AudioPitchMeter from "../components/AudioPitchMeter.vue";
 import SessionTimeline from "../components/SessionTimeline.vue";
-import ChallengeCard from "../components/ChallengeCard.vue";
+import PracticePlanCard from "../components/PracticePlanCard.vue";
+import PauseActions from "../components/PauseActions.vue";
 import { useMicrophone } from "../composables/useMicrophone";
 import { usePracticeSession } from "../composables/usePracticeSession";
 import { usePracticeStore } from "../stores/practice";
 import type {
   AnonymousPoseSnapshot,
+  PracticeActivityStats,
   PracticeReviewMoment,
 } from "../types/session";
 
 const practiceStore = usePracticeStore();
-const { level, pitchStability, startMicrophone, stopMicrophone } = useMicrophone();
+const {
+  signalActive,
+  hasReliablePitch,
+  calibrationState,
+  pitchStability,
+  noteName,
+  centsOffset,
+  permissionState: microphonePermission,
+  errorMessage: microphoneError,
+  startMicrophone,
+  calibrateNoise,
+  stopMicrophone,
+} = useMicrophone();
 const {
   coachMessage,
   loadingCoach,
   durationSeconds,
   startSession,
   endSession,
+  requestCoachMessage,
 } = usePracticeSession();
 
 const showGuideOverlay = ref(false);
 const enableDynamicTracking = ref(false);
+const showCameraControls = ref(false);
 const isPlaying = ref(false);
 const microFeedback = ref("");
 const reviewMoments = ref<PracticeReviewMoment[]>([]);
-let pulseTimer = 0;
+const activity = ref<PracticeActivityStats>(createEmptyActivity());
+const showPauseActions = ref(false);
+const startState = ref<"idle" | "preparing" | "blocked">("idle");
+const startIssue = ref("");
+const allowAudioOnly = ref(false);
+const allowStartAnyway = ref(false);
+const audioOnlyMode = ref(false);
+const cameraRequestId = ref(0);
+const cameraStatus = ref<{
+  permission: "idle" | "granted" | "denied";
+  trackingReady: boolean;
+  framing: "good" | "adjust" | "searching";
+  message: string;
+}>({
+  permission: "idle",
+  trackingReady: false,
+  framing: "searching",
+  message: "Waiting for camera.",
+});
+const pitchDataQuality = computed(() => activity.value.pitchDataQuality);
 let flowMonitorTimer = 0;
 let feedbackHideTimer = 0;
 let lastSoundAt = 0;
 let heardPlayingSincePause = false;
 let lastMicroFeedbackAt = 0;
+let lastCoachRequestAt = 0;
 let lastObservationKey = "";
 let pendingObservation: { key: string; message: string } | null = null;
 const activeObservationStarts = new Map<string, number>();
+let lastFlowSampleAt = 0;
+let currentPhraseStartedAt = 0;
 
-onMounted(async () => {
-  await startMicrophone();
+function createEmptyActivity(): PracticeActivityStats {
+  return {
+    phraseCount: 0,
+    phraseDurationsSeconds: [],
+    pauseCount: 0,
+    totalPlayingSeconds: 0,
+    longestContinuousSeconds: 0,
+    pitchedSeconds: 0,
+    inTuneSeconds: 0,
+    stablePitchSeconds: 0,
+    inTunePercent: 0,
+    stablePitchPercent: 0,
+    pitchDataQuality: "insufficient",
+  };
+}
+
+function updateActivityPercentages() {
+  const pitchedSeconds = activity.value.pitchedSeconds;
+  activity.value.inTunePercent = pitchedSeconds
+    ? Math.round((activity.value.inTuneSeconds / pitchedSeconds) * 100)
+    : 0;
+  activity.value.stablePitchPercent = pitchedSeconds
+    ? Math.round((activity.value.stablePitchSeconds / pitchedSeconds) * 100)
+    : 0;
+  activity.value.pitchDataQuality =
+    pitchedSeconds < 3
+      ? "insufficient"
+      : pitchedSeconds < 12
+        ? "limited"
+        : "good";
+}
+
+function finishCurrentPhrase() {
+  if (!currentPhraseStartedAt) return;
+  const phraseSeconds = Math.max(0, (lastSoundAt - currentPhraseStartedAt) / 1000);
+  activity.value.longestContinuousSeconds = Math.max(
+    activity.value.longestContinuousSeconds,
+    phraseSeconds,
+  );
+  if (phraseSeconds >= 0.5) {
+    activity.value.phraseDurationsSeconds.push(phraseSeconds);
+  }
+  currentPhraseStartedAt = 0;
+}
+
+onMounted(() => {
   flowMonitorTimer = window.setInterval(monitorPracticeFlow, 200);
 });
 
 onBeforeUnmount(() => {
-  clearInterval(pulseTimer);
   clearInterval(flowMonitorTimer);
   clearTimeout(feedbackHideTimer);
   stopMicrophone();
   if (practiceStore.isSessionActive) {
+    finishCurrentPhrase();
     closeActiveObservations();
-    endSession(reviewMoments.value);
+    updateActivityPercentages();
+    practiceStore.setPitchStability(activity.value.stablePitchPercent);
+    endSession(reviewMoments.value, activity.value);
   }
 });
 
-function startPractice() {
+function beginSession() {
   startSession();
   lastSoundAt = Date.now();
   heardPlayingSincePause = false;
   pendingObservation = null;
   lastObservationKey = "";
   lastMicroFeedbackAt = 0;
+  lastCoachRequestAt = 0;
   microFeedback.value = "";
   reviewMoments.value = [];
+  activity.value = createEmptyActivity();
+  lastFlowSampleAt = Date.now();
+  currentPhraseStartedAt = 0;
+  showPauseActions.value = false;
   activeObservationStarts.clear();
-  pulseTimer = window.setInterval(() => {
-    practiceStore.setPitchStability(pitchStability.value);
-    practiceStore.nudgePostureConfidence(Math.random() > 0.5 ? 1 : -1);
-    const challengeWasCompleted = practiceStore.activeChallenge.completed;
-    practiceStore.incrementChallenge();
-    if (!challengeWasCompleted && practiceStore.activeChallenge.completed) {
-      showMicroFeedback("Challenge complete. Nice focused work.");
+}
+
+function waitForCameraCheck(timeoutMs = 3500) {
+  return new Promise<void>((resolve) => {
+    const startedAt = Date.now();
+    const timer = window.setInterval(() => {
+      if (
+        cameraStatus.value.framing === "good" ||
+        cameraStatus.value.permission === "denied" ||
+        Date.now() - startedAt >= timeoutMs
+      ) {
+        window.clearInterval(timer);
+        resolve();
+      }
+    }, 120);
+  });
+}
+
+async function startPractice() {
+  if (startState.value === "preparing") return;
+  startState.value = "preparing";
+  startIssue.value = "";
+  allowAudioOnly.value = false;
+  allowStartAnyway.value = false;
+  audioOnlyMode.value = false;
+  prepareCamera();
+
+  await startMicrophone();
+  if (microphonePermission.value !== "granted") {
+    startState.value = "blocked";
+    startIssue.value = "Microphone access is needed to listen to the practice.";
+    return;
+  }
+  if (calibrationState.value !== "ready") {
+    const calibrated = await calibrateNoise();
+    if (!calibrated) {
+      startState.value = "blocked";
+      startIssue.value = "The microphone could not measure the room sound.";
+      return;
     }
-  }, 5000);
+  }
+
+  await waitForCameraCheck();
+  if (cameraStatus.value.permission === "denied") {
+    startState.value = "blocked";
+    startIssue.value = "Camera access is unavailable. You can continue with audio only.";
+    allowAudioOnly.value = true;
+    return;
+  }
+  if (cameraStatus.value.framing !== "good") {
+    startState.value = "blocked";
+    startIssue.value =
+      cameraStatus.value.message ||
+      "Keep your upper body and both hands inside the camera view.";
+    allowStartAnyway.value = true;
+    return;
+  }
+
+  startState.value = "idle";
+  beginSession();
+}
+
+function startAudioOnly() {
+  audioOnlyMode.value = true;
+  showGuideOverlay.value = false;
+  enableDynamicTracking.value = false;
+  startState.value = "idle";
+  startIssue.value = "";
+  beginSession();
+}
+
+function startWithoutGoodFraming() {
+  startState.value = "idle";
+  startIssue.value = "";
+  allowStartAnyway.value = false;
+  beginSession();
 }
 
 function stopPractice() {
-  clearInterval(pulseTimer);
   clearTimeout(feedbackHideTimer);
+  finishCurrentPhrase();
   isPlaying.value = false;
   microFeedback.value = "";
   pendingObservation = null;
+  showPauseActions.value = false;
   closeActiveObservations();
-  endSession(reviewMoments.value);
+  updateActivityPercentages();
+  practiceStore.setPitchStability(activity.value.stablePitchPercent);
+  endSession(reviewMoments.value, activity.value);
 }
 
 function toggleDynamicTracking() {
@@ -96,11 +256,43 @@ function toggleDynamicTracking() {
   if (enableDynamicTracking.value) showGuideOverlay.value = true;
 }
 
+watch(isPlaying, (playing) => {
+  if (playing) showCameraControls.value = false;
+});
+
+function prepareCamera() {
+  showGuideOverlay.value = true;
+  enableDynamicTracking.value = true;
+  cameraRequestId.value += 1;
+}
+
+function handleCameraStatus(payload: typeof cameraStatus.value) {
+  cameraStatus.value = payload;
+}
+
+function continueAfterPause(action: "again" | "next") {
+  showPauseActions.value = false;
+  microFeedback.value = "";
+  if (action === "next") {
+    if (practiceStore.practiceMode === "assignment") {
+      practiceStore.markPracticeRound();
+    }
+    practiceStore.addTimeline(
+      "coach",
+      practiceStore.practiceMode === "assignment"
+        ? "Moved to the next practice section."
+        : "Continued free practice.",
+    );
+  }
+}
+
 function handleObservation(payload: {
   phase: "issue" | "resolved";
   key: string;
   title: string;
   message: string;
+  confidence: number;
+  category: "framing" | "posture";
   snapshot: AnonymousPoseSnapshot;
 }) {
   if (!practiceStore.isSessionActive) return;
@@ -111,6 +303,7 @@ function handleObservation(payload: {
       existing.occurrences += 1;
       existing.lastSeenAt = now;
       existing.suggestion = payload.message;
+      existing.confidence = Math.max(existing.confidence ?? 0, payload.confidence);
     } else {
       reviewMoments.value.push({
         id: crypto.randomUUID(),
@@ -121,6 +314,8 @@ function handleObservation(payload: {
         lastSeenAt: now,
         occurrences: 1,
         totalDurationSeconds: 0,
+        confidence: payload.confidence,
+        category: payload.category,
         before: payload.snapshot,
       });
     }
@@ -143,18 +338,37 @@ function handleObservation(payload: {
 }
 
 function monitorPracticeFlow() {
+  practiceStore.setPitchStability(pitchStability.value);
   if (!practiceStore.isSessionActive) {
     isPlaying.value = false;
     return;
   }
 
   const now = Date.now();
-  const soundIsActive = level.value >= 4;
+  const sampleSeconds = lastFlowSampleAt
+    ? Math.min(0.5, Math.max(0, (now - lastFlowSampleAt) / 1000))
+    : 0;
+  lastFlowSampleAt = now;
+  const soundIsActive = signalActive.value && hasReliablePitch.value;
   if (soundIsActive) {
+    activity.value.totalPlayingSeconds += sampleSeconds;
+    if (noteName.value) {
+      activity.value.pitchedSeconds += sampleSeconds;
+      if (Math.abs(centsOffset.value) <= 15) {
+        activity.value.inTuneSeconds += sampleSeconds;
+      }
+      if (pitchStability.value >= 70) {
+        activity.value.stablePitchSeconds += sampleSeconds;
+      }
+      updateActivityPercentages();
+    }
     lastSoundAt = now;
     heardPlayingSincePause = true;
     if (!isPlaying.value) {
       isPlaying.value = true;
+      showPauseActions.value = false;
+      currentPhraseStartedAt = now;
+      activity.value.phraseCount += 1;
       microFeedback.value = "";
       clearTimeout(feedbackHideTimer);
     }
@@ -168,7 +382,14 @@ function monitorPracticeFlow() {
   ) {
     isPlaying.value = false;
     heardPlayingSincePause = false;
+    showPauseActions.value = true;
+    activity.value.pauseCount += 1;
+    finishCurrentPhrase();
     deliverPendingObservation();
+    if (now - lastCoachRequestAt >= 15000) {
+      lastCoachRequestAt = now;
+      void requestCoachMessage(reviewMoments.value, activity.value);
+    }
   }
 }
 
@@ -213,82 +434,164 @@ function closeActiveObservations() {
             :is-practice-active="practiceStore.isSessionActive"
             :is-playing="isPlaying"
             :micro-feedback="microFeedback"
+            :camera-request-id="cameraRequestId"
             @observation="handleObservation"
+            @status="handleCameraStatus"
           />
 
-          <div class="absolute left-4 top-4 z-20 w-44 rounded-2xl border border-white/10 bg-stage-900/80 p-3 shadow-2xl backdrop-blur-md sm:left-6 sm:top-6">
-            <div class="mb-3 flex items-center gap-2 border-b border-white/10 pb-3 text-sm font-medium">
+          <div class="absolute left-4 top-4 z-20 sm:left-6 sm:top-6">
+            <div class="flex h-9 items-center gap-2 rounded-full border border-white/10 bg-stage-900/55 px-3 text-xs font-medium shadow-lg backdrop-blur-md">
               <span class="h-2.5 w-2.5 rounded-full bg-lime-300 shadow-[0_0_12px_rgba(190,242,100,.8)]"></span>
               Camera
             </div>
-            <button
-              class="flex w-full items-center justify-between gap-3 rounded-xl px-2 py-2 text-left text-sm hover:bg-white/5"
-              @click="showGuideOverlay = !showGuideOverlay"
-            >
-              <span class="flex items-center gap-2">
-                <ViewfinderCircleIcon class="h-5 w-5" />
-                Reference Overlay
-              </span>
-              <span
-                class="relative h-6 w-11 shrink-0 rounded-full transition"
-                :class="showGuideOverlay ? 'bg-bowly-500' : 'bg-white/25'"
-              >
-                <span
-                  class="absolute top-1 h-4 w-4 rounded-full bg-white transition-all"
-                  :class="showGuideOverlay ? 'left-6' : 'left-1'"
-                ></span>
-              </span>
-            </button>
-            <button
-              class="flex w-full items-center justify-between gap-3 rounded-xl px-2 py-2 text-left text-sm hover:bg-white/5"
-              @click="toggleDynamicTracking"
-            >
-              <span class="flex items-center gap-2">
-                <CameraIcon class="h-5 w-5" />
-                Dynamic Tracking
-              </span>
-              <span
-                class="relative h-6 w-11 shrink-0 rounded-full transition"
-                :class="enableDynamicTracking ? 'bg-bowly-500' : 'bg-white/25'"
-              >
-                <span
-                  class="absolute top-1 h-4 w-4 rounded-full bg-white transition-all"
-                  :class="enableDynamicTracking ? 'left-6' : 'left-1'"
-                ></span>
-              </span>
-            </button>
           </div>
 
-          <div class="absolute right-4 top-4 z-20 rounded-xl border border-white/10 bg-stage-900/75 px-4 py-2 text-sm backdrop-blur-md sm:right-6 sm:top-6">
-            {{ Math.floor(durationSeconds / 60).toString().padStart(2, "0") }}:{{ (durationSeconds % 60).toString().padStart(2, "0") }}
+          <div class="absolute right-4 top-4 z-30 flex items-center gap-2 sm:right-6 sm:top-6">
+            <div class="rounded-full border border-white/10 bg-stage-900/55 px-3 py-2 text-xs tabular-nums backdrop-blur-md">
+              {{ Math.floor(durationSeconds / 60).toString().padStart(2, "0") }}:{{ (durationSeconds % 60).toString().padStart(2, "0") }}
+            </div>
+            <button
+              type="button"
+              class="grid h-9 w-9 place-items-center rounded-full border border-white/10 bg-stage-900/55 text-white/75 shadow-lg backdrop-blur-md hover:bg-stage-900/80 hover:text-white"
+              :aria-expanded="showCameraControls"
+              aria-label="Camera display settings"
+              @click="showCameraControls = !showCameraControls"
+            >
+              <AdjustmentsHorizontalIcon class="h-5 w-5" />
+            </button>
+
+            <div
+              v-if="showCameraControls"
+              class="absolute right-0 top-12 w-56 rounded-2xl border border-white/10 bg-stage-900/90 p-2 shadow-2xl backdrop-blur-xl"
+            >
+              <button
+                type="button"
+                class="flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left text-sm hover:bg-white/5"
+                @click="showGuideOverlay = !showGuideOverlay"
+              >
+                <span class="flex items-center gap-2.5">
+                  <ViewfinderCircleIcon class="h-5 w-5 text-white/60" />
+                  Reference overlay
+                </span>
+                <span
+                  class="relative h-5 w-9 shrink-0 rounded-full transition"
+                  :class="showGuideOverlay ? 'bg-bowly-500' : 'bg-white/20'"
+                >
+                  <span
+                    class="absolute top-1 h-3 w-3 rounded-full bg-white transition-all"
+                    :class="showGuideOverlay ? 'left-5' : 'left-1'"
+                  ></span>
+                </span>
+              </button>
+              <button
+                type="button"
+                class="flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left text-sm hover:bg-white/5"
+                @click="toggleDynamicTracking"
+              >
+                <span class="flex items-center gap-2.5">
+                  <CameraIcon class="h-5 w-5 text-white/60" />
+                  Dynamic tracking
+                </span>
+                <span
+                  class="relative h-5 w-9 shrink-0 rounded-full transition"
+                  :class="enableDynamicTracking ? 'bg-bowly-500' : 'bg-white/20'"
+                >
+                  <span
+                    class="absolute top-1 h-3 w-3 rounded-full bg-white transition-all"
+                    :class="enableDynamicTracking ? 'left-5' : 'left-1'"
+                  ></span>
+                </span>
+              </button>
+              <p class="flex items-center gap-1.5 px-3 pb-1 pt-2 text-[11px] text-white/35">
+                <ChevronUpIcon class="h-3.5 w-3.5 rotate-90" />
+                Controls stay hidden while you play.
+              </p>
+            </div>
           </div>
 
-          <div class="absolute inset-x-4 bottom-4 z-20 sm:inset-x-6 sm:bottom-6">
-            <AudioPitchMeter :pitch-stability="practiceStore.metrics.pitchStability" :level="level" />
+          <div class="absolute bottom-4 left-1/2 z-20 w-[min(94%,46rem)] -translate-x-1/2 sm:bottom-5">
+            <AudioPitchMeter
+              :pitch-stability="pitchStability"
+              :note-name="noteName"
+              :cents-offset="centsOffset"
+              :permission-state="microphonePermission"
+              :error-message="microphoneError"
+              :data-quality="pitchDataQuality"
+            />
           </div>
         </div>
 
-        <div class="flex flex-col gap-4 border-t border-white/10 bg-stage-900 px-4 py-5 sm:flex-row sm:items-center sm:px-6">
-          <button class="primary-button" :disabled="practiceStore.isSessionActive" @click="startPractice">
-            <PlayIcon class="h-5 w-5" />
-            Start Session
-          </button>
-          <p class="text-sm text-white/45 sm:mx-auto">Ensure good lighting and a clear view of your upper body.</p>
-          <button class="secondary-button" :disabled="!practiceStore.isSessionActive" @click="stopPractice">
+        <div
+          v-if="practiceStore.isSessionActive"
+          class="flex flex-col gap-4 border-t border-white/10 bg-stage-900 px-4 py-5 sm:flex-row sm:items-center sm:px-6"
+        >
+          <p class="text-sm text-white/45 sm:mr-auto">
+            {{ audioOnlyMode ? "Audio-only practice is active." : "Practice session is active." }}
+          </p>
+          <button class="secondary-button" @click="stopPractice">
             <StopIcon class="h-5 w-5" />
-            End Session
+            End Practice
           </button>
         </div>
+        <PauseActions
+          v-if="practiceStore.isSessionActive && showPauseActions && !isPlaying"
+          :assignment-mode="practiceStore.practiceMode === 'assignment'"
+          @again="continueAfterPause('again')"
+          @next="continueAfterPause('next')"
+          @end="stopPractice"
+        />
       </div>
 
       <aside class="divide-y divide-white/10 bg-[#201d28]">
-        <PracticeCoachPanel
-          :coach-message="coachMessage"
-          :loading-coach="loadingCoach"
-          :is-playing="isPlaying"
-        />
-        <ChallengeCard :challenge="practiceStore.activeChallenge" />
-        <SessionTimeline :events="practiceStore.timeline" />
+        <template v-if="isPlaying">
+          <PracticeCoachPanel
+            :coach-message="coachMessage"
+            :loading-coach="loadingCoach"
+            :is-playing="true"
+            compact
+          />
+        </template>
+        <template v-else-if="!practiceStore.isSessionActive">
+          <PracticePlanCard
+            :mode="practiceStore.practiceMode"
+            :assignment-title="practiceStore.assignmentTitle"
+            :assignment-image="practiceStore.assignmentImage"
+            :plan="practiceStore.activeChallenge"
+            :is-session-active="false"
+            :is-playing="false"
+            :activity="activity"
+            :start-state="startState"
+            :start-issue="startIssue"
+            :allow-audio-only="allowAudioOnly"
+            :allow-start-anyway="allowStartAnyway"
+            @update:mode="practiceStore.setPracticeMode"
+            @update:assignment-title="practiceStore.setAssignmentTitle"
+            @update:assignment-image="practiceStore.setAssignmentImage"
+            @start="startPractice"
+            @retry="startPractice"
+            @audio-only="startAudioOnly"
+            @start-anyway="startWithoutGoodFraming"
+          />
+        </template>
+        <template v-else>
+          <PracticeCoachPanel
+            :coach-message="coachMessage"
+            :loading-coach="loadingCoach"
+            :is-playing="false"
+          />
+          <PracticePlanCard
+            :mode="practiceStore.practiceMode"
+            :assignment-title="practiceStore.assignmentTitle"
+            :assignment-image="practiceStore.assignmentImage"
+            :plan="practiceStore.activeChallenge"
+            :is-session-active="true"
+            :is-playing="false"
+            :activity="activity"
+            @mark-round="practiceStore.markPracticeRound"
+            @complete="practiceStore.completePracticeGoal"
+          />
+          <SessionTimeline :events="practiceStore.timeline" />
+        </template>
       </aside>
     </div>
   </section>

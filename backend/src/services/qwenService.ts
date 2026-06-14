@@ -10,15 +10,9 @@ import type {
 import type { PracticeSessionRecord } from "../types/session.js";
 
 const CoachSchema = z.object({
-  praise: z.string(),
-  correction: z.string().nullable(),
-  encouragement: z.string(),
-  scenario: z.enum([
-    "good_improvement",
-    "low_motivation",
-    "posture_issue",
-    "challenge_success",
-  ]),
+  action: z.enum(["stay_quiet", "micro_feedback"]),
+  message: z.string(),
+  focus: z.enum(["effort", "pitch", "posture", "continuity"]),
 });
 
 const ParentReportSchema = z.object({
@@ -76,23 +70,32 @@ export async function createQwenCoachResponse(
 ): Promise<CoachResponse> {
   const response = await createStructuredResponse(
     CoachSchema,
-    `Create a gentle coaching response with these JSON fields:
-- praise: string
-- correction: string or null
-- encouragement: string
-- scenario: one of good_improvement, low_motivation, posture_issue, challenge_success
+    `Decide whether Bowly should stay quiet or give one gentle sentence.
+
+Return these JSON fields:
+- action: stay_quiet or micro_feedback
+- message: an empty string when staying quiet, otherwise one child-friendly sentence
+- focus: effort, pitch, posture, or continuity
+
+Rules:
+- Only use micro_feedback during a natural pause.
+- Stay quiet when evidence is weak, the issue is minor, or no useful observation exists.
+- Never claim that a note, body part, or technique is wrong.
+- Framing observations only describe camera visibility. Never turn them into posture advice.
+- Do not discuss pitch percentages unless pitchDataQuality is good.
+- Prefer acknowledging effort or suggesting one small next action.
+- Do not mention scores, percentages, AI, detection, or challenges.
+- Keep the message under 14 words.
 
 Child: ${payload.childName}
-Challenge: ${payload.challengeTitle}
-Pitch stability: ${payload.metrics.pitchStability}
-Posture confidence: ${payload.metrics.postureConfidence}
-Rhythm stability: ${payload.metrics.rhythmStability}
-Confidence level: ${payload.metrics.confidenceLevel}`
+Practice mode: ${payload.practiceMode}
+Practice activity: ${payload.practiceTitle}
+Natural pause: ${payload.naturalPause}
+Pitch stability: ${payload.pitchStability}
+Practice activity: ${JSON.stringify(payload.activity)}
+Persistent observations: ${JSON.stringify(payload.observations)}`
   );
-  return {
-    ...response,
-    correction: response.correction ?? undefined,
-  };
+  return response;
 }
 
 export async function createQwenParentReport(
@@ -109,9 +112,25 @@ export async function createQwenParentReport(
 
 Child: ${payload.childName}
 Duration seconds: ${payload.durationSeconds}
+Practice mode: ${payload.practiceMode ?? "legacy session"}
+Practice activity: ${payload.challenge.title}
 Pitch: ${payload.metrics.pitchStability}
-Posture: ${payload.metrics.postureConfidence}
-Confidence: ${payload.metrics.confidenceLevel}`
+Measured activity: ${JSON.stringify(payload.activity ?? null)}
+Recorded review moments: ${JSON.stringify(
+      (payload.reviewMoments ?? []).slice(0, 3).map((moment) => ({
+        title: moment.title,
+        durationSeconds: moment.totalDurationSeconds,
+        occurrences: moment.occurrences,
+        suggestion: moment.suggestion,
+      }))
+    )}
+
+Use measured playing time, phrase count, longest continuous phrase, pitch
+percentages, completed rounds, and recorded camera-view observations as facts.
+Do not invent posture, motivation, emotional state, technique, or progress.
+Framing observations are camera setup notes, not posture problems. When
+evidence is unavailable, say that no reliable observation was recorded. Do not
+interpret pitch percentages when pitchDataQuality is insufficient or limited.`
   );
 }
 
@@ -128,8 +147,10 @@ Number of sessions: ${sessions.length}
 Sessions snapshot: ${JSON.stringify(
       sessions.slice(-5).map((session) => ({
         durationSeconds: session.durationSeconds,
-        confidenceLevel: session.metrics.confidenceLevel,
-        postureConfidence: session.metrics.postureConfidence,
+        practiceMode: session.practiceMode,
+        phraseCount: session.activity?.phraseCount,
+        totalPlayingSeconds: session.activity?.totalPlayingSeconds,
+        inTunePercent: session.activity?.inTunePercent,
       }))
     )}`
   );

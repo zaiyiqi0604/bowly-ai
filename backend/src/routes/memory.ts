@@ -38,6 +38,7 @@ const memoryRequestSchema = z.object({
       endedAt: z.number(),
       durationSeconds: z.number(),
       childName: z.string(),
+      practiceMode: z.enum(["assignment", "free"]).optional(),
       metrics: z.object({
         bowStability: z.number(),
         pitchStability: z.number(),
@@ -73,10 +74,25 @@ const memoryRequestSchema = z.object({
           lastSeenAt: z.number(),
           occurrences: z.number(),
           totalDurationSeconds: z.number(),
+          confidence: z.number().min(0).max(1).optional(),
+          category: z.enum(["framing", "posture"]).optional(),
           before: poseSnapshotSchema,
           after: poseSnapshotSchema.optional(),
         })
       ).optional(),
+      activity: z.object({
+        phraseCount: z.number().int().min(0),
+        phraseDurationsSeconds: z.array(z.number().min(0)),
+        pauseCount: z.number().int().min(0),
+        totalPlayingSeconds: z.number().min(0),
+        longestContinuousSeconds: z.number().min(0),
+        pitchedSeconds: z.number().min(0),
+        inTuneSeconds: z.number().min(0),
+        stablePitchSeconds: z.number().min(0),
+        inTunePercent: z.number().min(0).max(100),
+        stablePitchPercent: z.number().min(0).max(100),
+        pitchDataQuality: z.enum(["insufficient", "limited", "good"]),
+      }).optional(),
     })
   ),
 });
