@@ -4,6 +4,8 @@ import {
   AdjustmentsHorizontalIcon,
   CameraIcon,
   ChevronUpIcon,
+  PlayIcon,
+  SparklesIcon,
   StopIcon,
   ViewfinderCircleIcon,
 } from "@heroicons/vue/24/outline";
@@ -71,6 +73,18 @@ const cameraStatus = ref<{
   message: "Waiting for camera.",
 });
 const pitchDataQuality = computed(() => activity.value.pitchDataQuality);
+const mobileAmbientStatus = computed(() => {
+  if (startState.value === "preparing") return "Checking camera and microphone";
+  if (startIssue.value) return startIssue.value;
+  if (!practiceStore.isSessionActive) {
+    return cameraStatus.value.framing === "good" ? "Ready to play" : cameraStatus.value.message;
+  }
+  if (cameraStatus.value.framing !== "good") return cameraStatus.value.message;
+  return isPlaying.value ? "Posture steady" : "Listening when you play";
+});
+const mobileAmbientTone = computed(() =>
+  startIssue.value || cameraStatus.value.framing === "adjust" ? "adjust" : "good",
+);
 let flowMonitorTimer = 0;
 let feedbackHideTimer = 0;
 let lastSoundAt = 0;
@@ -424,11 +438,12 @@ function closeActiveObservations() {
 </script>
 
 <template>
-  <section class="min-h-[calc(100vh-4.5rem)] bg-stage-950 text-white">
+  <section class="min-h-[calc(100vh-4.5rem)] bg-stage-950 pb-0 text-white">
     <div class="mx-auto grid max-w-[1600px] xl:grid-cols-[minmax(0,2.25fr)_minmax(340px,0.9fr)]">
       <div class="min-w-0 border-white/10 xl:border-r">
-        <div class="relative">
+        <div class="relative max-md:h-[calc(100dvh-4.25rem)] max-md:min-h-[34rem] max-md:overflow-hidden">
           <CameraPanel
+            class="max-md:!h-full max-md:!min-h-0"
             :show-guide-overlay="showGuideOverlay"
             :enable-dynamic-tracking="enableDynamicTracking"
             :is-practice-active="practiceStore.isSessionActive"
@@ -444,6 +459,18 @@ function closeActiveObservations() {
               <span class="h-2.5 w-2.5 rounded-full bg-lime-300 shadow-[0_0_12px_rgba(190,242,100,.8)]"></span>
               Camera
             </div>
+          </div>
+
+          <div
+            class="absolute left-4 top-14 z-20 flex max-w-[calc(100%-8rem)] items-center gap-2 rounded-full border border-white/10 bg-stage-950/55 px-3 py-1.5 text-[11px] text-white/70 shadow-lg backdrop-blur-md md:hidden"
+          >
+            <span
+              class="h-2 w-2 shrink-0 rounded-full"
+              :class="mobileAmbientTone === 'good'
+                ? 'bg-lime-300 shadow-[0_0_10px_rgba(190,242,100,.55)]'
+                : 'bg-amber-300 shadow-[0_0_10px_rgba(252,211,77,.45)]'"
+            ></span>
+            <span class="truncate">{{ mobileAmbientStatus }}</span>
           </div>
 
           <div class="absolute right-4 top-4 z-30 flex items-center gap-2 sm:right-6 sm:top-6">
@@ -509,7 +536,7 @@ function closeActiveObservations() {
             </div>
           </div>
 
-          <div class="absolute bottom-4 left-1/2 z-20 w-[min(94%,46rem)] -translate-x-1/2 sm:bottom-5">
+          <div class="absolute bottom-4 left-1/2 z-20 hidden w-[min(94%,46rem)] -translate-x-1/2 md:block">
             <AudioPitchMeter
               :pitch-stability="pitchStability"
               :note-name="noteName"
@@ -519,11 +546,78 @@ function closeActiveObservations() {
               :data-quality="pitchDataQuality"
             />
           </div>
+
+          <div
+            v-if="microFeedback"
+            class="absolute inset-x-3 bottom-[5.75rem] z-30 flex items-start gap-2.5 rounded-2xl border border-bowly-300/20 bg-stage-950/82 px-3.5 py-2.5 text-xs shadow-2xl backdrop-blur-xl md:hidden"
+          >
+            <SparklesIcon class="mt-0.5 h-4 w-4 shrink-0 text-bowly-200" />
+            <div class="min-w-0">
+              <p class="text-[10px] font-semibold uppercase tracking-[0.12em] text-bowly-200/70">AI Coach</p>
+              <p class="mt-0.5 truncate text-white/85">{{ microFeedback }}</p>
+            </div>
+          </div>
+
+          <div class="absolute inset-x-0 bottom-0 z-40 border-t border-white/10 bg-stage-950/88 px-3 pb-[max(.65rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-16px_40px_rgba(9,8,14,.35)] backdrop-blur-xl md:hidden">
+            <div
+              v-if="startIssue"
+              class="mb-2 flex items-center justify-between gap-2 rounded-xl bg-amber-300/10 px-3 py-2 text-[11px] text-amber-100/85"
+            >
+              <span class="line-clamp-2">{{ startIssue }}</span>
+              <button
+                v-if="allowAudioOnly"
+                type="button"
+                class="shrink-0 font-semibold text-bowly-200"
+                @click="startAudioOnly"
+              >
+                Audio only
+              </button>
+              <button
+                v-else-if="allowStartAnyway"
+                type="button"
+                class="shrink-0 font-semibold text-bowly-200"
+                @click="startWithoutGoodFraming"
+              >
+                Start anyway
+              </button>
+            </div>
+            <div class="flex items-center gap-2.5">
+              <AudioPitchMeter
+                class="min-w-0 flex-1"
+                compact
+                :pitch-stability="pitchStability"
+                :note-name="noteName"
+                :cents-offset="centsOffset"
+                :permission-state="microphonePermission"
+                :error-message="microphoneError"
+                :data-quality="pitchDataQuality"
+              />
+              <button
+                v-if="practiceStore.isSessionActive"
+                type="button"
+                class="flex h-12 shrink-0 items-center gap-1.5 rounded-xl bg-bowly-500 px-4 text-sm font-semibold text-white shadow-lg shadow-bowly-950/30"
+                @click="stopPractice"
+              >
+                <StopIcon class="h-4 w-4" />
+                Stop
+              </button>
+              <button
+                v-else
+                type="button"
+                class="flex h-12 shrink-0 items-center gap-1.5 rounded-xl bg-bowly-500 px-4 text-sm font-semibold text-white shadow-lg shadow-bowly-950/30 disabled:cursor-wait disabled:opacity-70"
+                :disabled="startState === 'preparing'"
+                @click="startPractice"
+              >
+                <PlayIcon class="h-4 w-4" />
+                {{ startState === "preparing" ? "Checking" : "Start" }}
+              </button>
+            </div>
+          </div>
         </div>
 
         <div
           v-if="practiceStore.isSessionActive"
-          class="flex flex-col gap-4 border-t border-white/10 bg-stage-900 px-4 py-5 sm:flex-row sm:items-center sm:px-6"
+          class="hidden flex-col gap-4 border-t border-white/10 bg-stage-900 px-4 py-5 sm:flex-row sm:items-center sm:px-6 md:flex"
         >
           <p class="text-sm text-white/45 sm:mr-auto">
             {{ audioOnlyMode ? "Audio-only practice is active." : "Practice session is active." }}
@@ -535,6 +629,7 @@ function closeActiveObservations() {
         </div>
         <PauseActions
           v-if="practiceStore.isSessionActive && showPauseActions && !isPlaying"
+          class="max-md:hidden"
           :assignment-mode="practiceStore.practiceMode === 'assignment'"
           @again="continueAfterPause('again')"
           @next="continueAfterPause('next')"
@@ -542,7 +637,7 @@ function closeActiveObservations() {
         />
       </div>
 
-      <aside class="divide-y divide-white/10 bg-[#201d28]">
+      <aside class="divide-y divide-white/10 bg-[#201d28] max-md:hidden">
         <template v-if="isPlaying">
           <PracticeCoachPanel
             :coach-message="coachMessage"

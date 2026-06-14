@@ -9,6 +9,7 @@ const props = defineProps<{
   permissionState: "idle" | "granted" | "denied";
   errorMessage: string;
   dataQuality: "insufficient" | "limited" | "good";
+  compact?: boolean;
 }>();
 
 const pointerPosition = computed(() =>
@@ -50,41 +51,59 @@ const shortNoteName = computed(() => props.noteName.replace(/\d+$/, ""));
 </script>
 
 <template>
-  <section class="rounded-xl border border-white/15 bg-stage-900/88 px-3 py-2.5 shadow-xl backdrop-blur-md sm:px-4">
-    <div class="flex items-center gap-3">
-      <div class="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-bowly-400/10">
+  <section
+    class="rounded-xl border border-white/15 bg-stage-900/88 shadow-xl backdrop-blur-md"
+    :class="compact ? 'px-2.5 py-2' : 'px-3 py-2.5 sm:px-4'"
+  >
+    <div class="flex items-center" :class="compact ? 'gap-2' : 'gap-3'">
+      <div
+        class="shrink-0 place-items-center rounded-lg bg-bowly-400/10"
+        :class="compact ? 'hidden' : 'grid h-8 w-8'"
+      >
         <MusicalNoteIcon class="h-5 w-5 text-bowly-200" />
       </div>
 
-      <div class="w-28 shrink-0">
+      <div :class="compact ? 'w-[4.6rem] shrink-0' : 'w-28 shrink-0'">
         <div class="flex items-center gap-2">
           <span
+            v-if="compact && noteName"
+            class="text-lg font-semibold leading-none text-white"
+          >
+            {{ shortNoteName }}
+          </span>
+          <span
             class="h-2 w-2 rounded-full"
-            :class="tuningState.tone === 'tuned'
-              ? 'bg-lime-300'
-              : noteName
-                ? 'bg-amber-300'
-                : 'bg-white/30'"
+            :class="[
+              { hidden: compact && noteName },
+              tuningState.tone === 'tuned'
+                ? 'bg-lime-300'
+                : noteName
+                  ? 'bg-amber-300'
+                  : 'bg-white/30',
+            ]"
           ></span>
           <strong
-            class="text-sm font-semibold"
-            :class="tuningState.tone === 'tuned' ? 'text-lime-200' : 'text-white/85'"
+            class="font-semibold"
+            :class="[
+              compact ? 'truncate text-[11px]' : 'text-sm',
+              tuningState.tone === 'tuned' ? 'text-lime-200' : 'text-white/85',
+            ]"
           >
             {{ tuningState.label }}
           </strong>
         </div>
-        <span class="mt-0.5 block truncate text-[11px] text-white/45">
+        <span v-if="!compact" class="mt-0.5 block truncate text-[11px] text-white/45">
           {{ tuningState.detail }}
         </span>
       </div>
 
       <div class="min-w-0 flex-1">
-        <div class="mb-1 flex justify-between text-[9px] font-medium uppercase tracking-[0.1em] text-white/35">
+        <div v-if="!compact" class="mb-1 flex justify-between text-[9px] font-medium uppercase tracking-[0.1em] text-white/35">
           <span>Higher</span>
           <span class="text-lime-200/70">Good</span>
           <span>Lower</span>
         </div>
-        <div class="relative h-5">
+        <div class="relative" :class="compact ? 'h-4' : 'h-5'">
           <div class="absolute inset-x-0 top-2 h-1.5 rounded-full bg-gradient-to-r from-amber-300/35 via-lime-300/70 to-amber-300/35"></div>
           <div class="absolute left-[35%] top-1 h-3.5 w-[30%] rounded-full border border-lime-100/25 bg-lime-200/10"></div>
           <div class="absolute left-1/2 top-0 h-5 w-px -translate-x-1/2 bg-lime-100/70"></div>
@@ -119,6 +138,6 @@ const shortNoteName = computed(() => props.noteName.replace(/\d+$/, ""));
       </div>
     </div>
 
-    <p v-if="errorMessage" class="mt-1.5 text-xs text-amber-200/80">{{ errorMessage }}</p>
+    <p v-if="errorMessage && !compact" class="mt-1.5 text-xs text-amber-200/80">{{ errorMessage }}</p>
   </section>
 </template>
