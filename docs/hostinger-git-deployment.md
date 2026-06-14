@@ -52,6 +52,12 @@ Add these four secrets:
 | `HOSTINGER_FTP_PASSWORD` | The FTP account password |
 | `HOSTINGER_FTP_REMOTE_DIR` | Usually `/public_html`, or `/` if the FTP account already opens there |
 
+Optional:
+
+| Secret | Value |
+| --- | --- |
+| `HOSTINGER_FTP_PORT` | Hostinger FTP port; defaults to `21` |
+
 Do not put these values in repository files.
 
 ## 3. Run the First Deployment
@@ -127,3 +133,15 @@ or already starts inside `public_html`, in which case use:
 
 Confirm that `HOSTINGER_FTP_HOST` is Hostinger's supplied FTP hostname rather
 than a custom domain whose TLS certificate does not match the FTP server.
+
+### `max-retries exceeded`
+
+This means the runner could not establish a usable FTP connection before it
+attempted to upload files. Check:
+
+1. `HOSTINGER_FTP_HOST` contains only the FTP hostname, without `ftp://`,
+   `ftps://`, a path, or a port.
+2. `HOSTINGER_FTP_PORT` is `21` unless hPanel explicitly shows another FTP
+   port.
+3. The FTP account is active and can connect from an external FTP client.
+4. Hostinger is not restricting FTP access by IP address.

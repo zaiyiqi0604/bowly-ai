@@ -1,5 +1,8 @@
 name: Deploy frontend to Hostinger
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 on:
   push:
     branches:
@@ -57,19 +60,32 @@ jobs:
           FTP_USERNAME: ${{ secrets.HOSTINGER_FTP_USERNAME }}
           FTP_PASSWORD: ${{ secrets.HOSTINGER_FTP_PASSWORD }}
           FTP_REMOTE_DIR: ${{ secrets.HOSTINGER_FTP_REMOTE_DIR }}
+          FTP_PORT: ${{ secrets.HOSTINGER_FTP_PORT || '21' }}
         run: |
           test -n "$FTP_HOST"
           test -n "$FTP_USERNAME"
           test -n "$FTP_PASSWORD"
           test -n "$FTP_REMOTE_DIR"
 
-          lftp -u "$FTP_USERNAME","$FTP_PASSWORD" "$FTP_HOST" <<LFTP_COMMANDS
+          FTP_HOST="${FTP_HOST#ftp://}"
+          FTP_HOST="${FTP_HOST#ftps://}"
+          FTP_HOST="${FTP_HOST%/}"
+
+          echo "Connecting to Hostinger FTP on port $FTP_PORT..."
+
+          lftp <<LFTP_COMMANDS
           set cmd:fail-exit yes
-          set net:max-retries 3
-          set net:timeout 20
+          set dns:order inet
+          set net:max-retries 2
+          set net:timeout 15
+          set net:reconnect-interval-base 5
+          set ftp:passive-mode true
+          set ftp:use-epsv false
           set ftp:ssl-force true
           set ftp:ssl-protect-data true
           set ssl:verify-certificate true
+          open -p "$FTP_PORT" -u "$FTP_USERNAME","$FTP_PASSWORD" "ftp://$FTP_HOST"
+          cls -1
           mirror --reverse --delete --verbose \
             --exclude-glob .well-known/** \
             --exclude-glob .ftpquota \
