@@ -47,7 +47,7 @@ Add these four secrets:
 
 | Secret | Value |
 | --- | --- |
-| `HOSTINGER_FTP_HOST` | The Hostinger FTP hostname, without `ftp://` |
+| `HOSTINGER_FTP_HOST` | Hostinger's FTP hostname or IP, without `ftp://` |
 | `HOSTINGER_FTP_USERNAME` | The complete FTP username |
 | `HOSTINGER_FTP_PASSWORD` | The FTP account password |
 | `HOSTINGER_FTP_REMOTE_DIR` | Usually `/public_html`, or `/` if the FTP account already opens there |
@@ -131,8 +131,14 @@ or already starts inside `public_html`, in which case use:
 
 ### TLS certificate error
 
-Confirm that `HOSTINGER_FTP_HOST` is Hostinger's supplied FTP hostname rather
-than a custom domain whose TLS certificate does not match the FTP server.
+Some Hostinger shared-hosting plans expose FTP only as an IP address, for
+example `153.92.11.158`, while the server certificate is issued to an internal
+hostname. The workflow therefore keeps FTPS encryption enabled but disables
+certificate identity verification for this FTP connection.
+
+Use only the exact FTP IP supplied in hPanel. Do not substitute the website
+domain or an unrelated FTP endpoint. SFTP with host-key verification should be
+preferred if the Hostinger plan later provides SSH access.
 
 ### `max-retries exceeded`
 

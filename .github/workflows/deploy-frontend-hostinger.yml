@@ -82,7 +82,9 @@ jobs:
           set ftp:passive-mode true
           set ftp:ssl-force true
           set ftp:ssl-protect-data true
-          set ssl:verify-certificate true
+          # Hostinger exposes this shared-hosting FTP endpoint by IP while its
+          # TLS certificate is issued to an internal hostname.
+          set ssl:verify-certificate false
           open -p "$FTP_PORT" -u "$FTP_USERNAME","$FTP_PASSWORD" "ftp://$FTP_HOST"
           cls -1
           mirror --reverse --delete --verbose \
