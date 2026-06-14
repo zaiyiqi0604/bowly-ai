@@ -382,11 +382,23 @@ function updateTrackingGuidance(landmarks: Keypoint[]) {
 
   const shoulderWidth = Math.abs(shoulders[1]!.x - shoulders[0]!.x);
   const shoulderCenter = (shoulders[0]!.x + shoulders[1]!.x) / 2;
+  if (armsVisible < 3) {
+    currentFramingIssue = {
+      key: "arms-not-visible",
+      title: "Camera framing",
+      detail: "Move the phone slightly farther away or turn it sideways so both hands stay visible.",
+      confidence: 0.86,
+    };
+    framingTone.value = "adjust";
+    framingTitle.value = "Keep both hands in view";
+    framingDetail.value = "A wider view is more useful than moving closer.";
+    return;
+  }
   if (shoulderWidth > PROCESSING_WIDTH * 0.48) {
     currentFramingIssue = {
       key: "too-close",
-      title: "Camera distance",
-      detail: "Move back a little so both arms stay visible.",
+      title: "Camera framing",
+      detail: "Move the phone slightly farther away or turn it sideways so both hands stay visible.",
       confidence: 0.88,
     };
     framingTone.value = "adjust";
@@ -394,16 +406,16 @@ function updateTrackingGuidance(landmarks: Keypoint[]) {
     framingDetail.value = "Leave enough room for both elbows and hands.";
     return;
   }
-  if (shoulderWidth < PROCESSING_WIDTH * 0.16) {
+  if (armsVisible === 4 && shoulderWidth < PROCESSING_WIDTH * 0.12) {
     currentFramingIssue = {
       key: "too-far",
       title: "Camera distance",
-      detail: "Move a little closer for clearer tracking.",
+      detail: "If tracking remains unclear, move the phone slightly closer without cropping either hand.",
       confidence: 0.86,
     };
     framingTone.value = "adjust";
-    framingTitle.value = "Move a little closer";
-    framingDetail.value = "Your shoulders are too small for stable tracking.";
+    framingTitle.value = "Tracking view is very small";
+    framingDetail.value = "Keep both hands visible if you adjust the phone.";
     return;
   }
   if (shoulderCenter < PROCESSING_WIDTH * 0.32) {
@@ -430,19 +442,6 @@ function updateTrackingGuidance(landmarks: Keypoint[]) {
     framingDetail.value = "Center your shoulders inside the camera frame.";
     return;
   }
-  if (armsVisible < 3) {
-    currentFramingIssue = {
-      key: "arms-not-visible",
-      title: "Arm visibility",
-      detail: "Keep both hands and elbows inside the camera view.",
-      confidence: 0.82,
-    };
-    framingTone.value = "adjust";
-    framingTitle.value = "Show both arms";
-    framingDetail.value = "Keep elbows and hands inside the frame while playing.";
-    return;
-  }
-
   currentFramingIssue = null;
   framingTone.value = "good";
   framingTitle.value = "Framing looks good";

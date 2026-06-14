@@ -39,6 +39,15 @@ const reviewMoments = computed(() =>
     .slice(0, 3)
 );
 const primaryReview = computed(() => reviewMoments.value[0] ?? null);
+function setupSuggestion(key: string) {
+  if (key === "too-far") {
+    return "Keep both hands visible. Only move the phone slightly closer if tracking is still unclear.";
+  }
+  if (key === "off-center") {
+    return "Center the player while keeping both hands and the bow inside the frame.";
+  }
+  return "Place the phone slightly farther away or turn it sideways so both hands and the bow remain visible.";
+}
 const fallbackSuggestion = computed(() =>
   latestSession.value?.practiceMode === "assignment"
     ? "Continue the same assigned section with one calm repeat."
@@ -227,7 +236,7 @@ onMounted(async () => {
                     v-else
                     class="grid h-44 place-items-center rounded-xl border border-dashed border-lime-300 bg-lime-50 px-6 text-center text-sm leading-6 text-lime-800"
                   >
-                    Adjust the camera before the next session so both hands remain visible.
+                    {{ setupSuggestion(moment.key) }}
                   </div>
                 </div>
               </div>
