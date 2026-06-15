@@ -1,6 +1,8 @@
 import cors from "cors";
 import dotenv from "dotenv";
 import express from "express";
+import { logServerError, requestLogger } from "./middleware/requestLogger.js";
+import clientErrorsRouter from "./routes/clientErrors.js";
 import coachRouter from "./routes/coach.js";
 import healthRouter from "./routes/health.js";
 import memoryRouter from "./routes/memory.js";
@@ -12,9 +14,11 @@ export function createApp() {
   const app = express();
 
   app.use(cors());
+  app.use(requestLogger);
   app.use(express.json({ limit: "1mb" }));
 
   app.use(healthRouter);
+  app.use(clientErrorsRouter);
   app.use(coachRouter);
   app.use(reportRouter);
   app.use(memoryRouter);
@@ -22,11 +26,11 @@ export function createApp() {
   app.use(
     (
       error: unknown,
-      _req: express.Request,
+      req: express.Request,
       res: express.Response,
       _next: express.NextFunction
     ) => {
-      console.error(error);
+      logServerError(error, res.locals.requestId, req.path);
       res.status(400).json({
         error: "Request failed",
         detail: error instanceof Error ? error.message : "Unknown error",

@@ -24,7 +24,7 @@ healthRouter.get("/", (_req, res) => {
   res.json({
     ...createHealthResponse(),
     message: "Bowly AI backend is running.",
-    endpoints: ["/health", "/coach", "/report", "/memory/summary"],
+    endpoints: ["/health", "/coach", "/report", "/memory/summary", "/client-errors"],
   });
 });
 

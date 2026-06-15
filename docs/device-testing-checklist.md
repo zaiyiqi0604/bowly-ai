@@ -34,6 +34,16 @@ verified on physical devices before presenting tracking accuracy as complete.
 - Phone and tablet layouts have no horizontal overflow.
 - Ending a session produces activity totals that match a timed manual check
   within two seconds.
+- Camera and microphone remain off before Start and are released within two
+  seconds after Stop or page navigation.
+- Safari does not reload or blank the practice page when the phone rotates.
+- Android Chrome keeps the fixed Start/Stop control above the browser safe
+  area and on-screen keyboard.
+- A child can read delayed feedback before it disappears; target display time
+  is eight seconds.
+- Camera setup events do not reduce stars, badges, or movement ratings.
+- With `/practice?debug=1`, each shown or suppressed feedback decision has a
+  clear reason.
 
 ## Child comprehension test
 
@@ -45,3 +55,14 @@ Ask the child, without explaining the screen:
 4. What would you choose to do next?
 
 Revise any label that the child cannot explain in their own words.
+
+## Repeat-session validation
+
+Complete at least five sessions across two or more days:
+
+- Long-term trends remain hidden or say that more data is needed before three
+  valid sessions exist.
+- Practice-day counts do not count multiple sessions on one day as multiple
+  days.
+- Badges unlock only after their measurable condition is met.
+- Old sessions without newer activity fields do not break the report.

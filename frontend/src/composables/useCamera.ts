@@ -16,6 +16,7 @@ export function useCamera() {
         video: {
           width: { ideal: 640, max: 640 },
           height: { ideal: 480, max: 480 },
+          aspectRatio: { ideal: 4 / 3 },
           frameRate: { ideal: 15, max: 20 },
           facingMode: "user",
         },

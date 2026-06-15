@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref, watch } from "vue";
 import { MusicalNoteIcon } from "@heroicons/vue/24/outline";
 
 const props = defineProps<{
@@ -12,37 +12,53 @@ const props = defineProps<{
   compact?: boolean;
 }>();
 
+const displayedCents = ref(0);
+watch(
+  () => props.centsOffset,
+  (next) => {
+    const softened = Math.abs(next) <= 8 ? 0 : next;
+    displayedCents.value += (softened - displayedCents.value) * 0.35;
+  },
+  { immediate: true },
+);
+watch(
+  () => props.noteName,
+  (next, previous) => {
+    if (next !== previous) displayedCents.value = 0;
+  },
+);
+
 const pointerPosition = computed(() =>
-  Math.max(3, Math.min(97, 50 + props.centsOffset))
+  Math.max(5, Math.min(95, 50 + displayedCents.value * 0.8))
 );
 
 const tuningState = computed(() => {
   if (!props.noteName) {
     return {
       label: "Listening",
-      detail: "Play one clear note.",
+      detail: "Play one clear, steady note.",
       tone: "listening",
     };
   }
 
   const absoluteOffset = Math.abs(props.centsOffset);
-  if (absoluteOffset <= 15) {
+  if (absoluteOffset <= 20) {
     return {
-      label: "Centered",
-      detail: "Keep this sound.",
+      label: "In tune",
+      detail: "Close to the nearest standard note.",
       tone: "tuned",
     };
   }
   if (props.centsOffset < 0) {
     return {
-      label: absoluteOffset <= 30 ? "Nearly centered" : "Move higher",
-      detail: "Move the finger a tiny bit higher.",
+      label: absoluteOffset <= 35 ? "Nearly there" : "A little low",
+      detail: "Only adjust if this pitch is intentional.",
       tone: "adjust",
     };
   }
   return {
-    label: absoluteOffset <= 30 ? "Nearly centered" : "Move lower",
-    detail: "Move the finger a tiny bit lower.",
+    label: absoluteOffset <= 35 ? "Nearly there" : "A little high",
+    detail: "Only adjust if this pitch is intentional.",
     tone: "adjust",
   };
 });
@@ -99,17 +115,16 @@ const shortNoteName = computed(() => props.noteName.replace(/\d+$/, ""));
 
       <div class="min-w-0 flex-1">
         <div v-if="!compact" class="mb-1 flex justify-between text-[9px] font-medium uppercase tracking-[0.1em] text-white/35">
-          <span>Higher</span>
-          <span class="text-lime-200/70">Good</span>
-          <span>Lower</span>
+          <span>Low</span>
+          <span class="text-lime-200/70">In tune</span>
+          <span>High</span>
         </div>
         <div class="relative" :class="compact ? 'h-4' : 'h-5'">
           <div class="absolute inset-x-0 top-2 h-1.5 rounded-full bg-gradient-to-r from-amber-300/35 via-lime-300/70 to-amber-300/35"></div>
-          <div class="absolute left-[35%] top-1 h-3.5 w-[30%] rounded-full border border-lime-100/25 bg-lime-200/10"></div>
-          <div class="absolute left-1/2 top-0 h-5 w-px -translate-x-1/2 bg-lime-100/70"></div>
+          <div class="absolute left-[30%] top-1 h-3.5 w-[40%] rounded-full border border-lime-100/25 bg-lime-200/10"></div>
           <div
             v-if="noteName"
-            class="absolute top-0.5 h-4 w-1.5 -translate-x-1/2 rounded-full transition-[left,background-color] duration-150"
+            class="absolute top-0.5 h-4 w-2 -translate-x-1/2 rounded-full transition-[left,background-color] duration-300 ease-out"
             :class="tuningState.tone === 'tuned'
               ? 'bg-lime-100 shadow-[0_0_10px_rgba(190,242,100,.7)]'
               : 'bg-amber-200'"

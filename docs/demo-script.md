@@ -26,9 +26,10 @@ Qwen Cloud for coaching and reflection.
 ## 1:35-2:10 — Qwen Cloud
 
 1. Show the `Qwen Live · qwen3.7-plus` status.
-2. End the session and open Parent Report.
-3. Show Qwen-generated highlights, the next-practice suggestion, and anonymous
-   before/after joint diagrams.
+2. End the session and open the child-friendly practice recap.
+3. Show effort stars, one clear win, one mini challenge, and a newly unlocked
+   badge.
+4. Open Parent Details and show Qwen-generated reflection plus recent trends.
 
 ## 2:10-2:30 — Edge Resilience
 

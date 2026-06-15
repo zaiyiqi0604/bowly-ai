@@ -8,6 +8,7 @@ import {
   PlayIcon,
   SparklesIcon,
   StopIcon,
+  WrenchScrewdriverIcon,
   ViewfinderCircleIcon,
 } from "@heroicons/vue/24/outline";
 import CameraPanel from "../components/CameraPanel.vue";
@@ -64,6 +65,17 @@ const allowStartAnyway = ref(false);
 const audioOnlyMode = ref(false);
 const cameraRequestId = ref(0);
 const cameraEnabled = ref(false);
+const showFeedbackDebug = ref(false);
+const feedbackDebugEnabled =
+  import.meta.env.DEV ||
+  new URLSearchParams(window.location.search).get("debug") === "1";
+type FeedbackDebugEntry = {
+  id: string;
+  at: number;
+  type: "detect" | "suppress" | "feedback" | "ai" | "flow";
+  message: string;
+};
+const feedbackDebugEntries = ref<FeedbackDebugEntry[]>([]);
 const cameraStatus = ref<{
   permission: "idle" | "granted" | "denied";
   trackingReady: boolean;
@@ -97,8 +109,23 @@ let lastCoachRequestAt = 0;
 let lastObservationKey = "";
 let pendingObservation: { key: string; message: string } | null = null;
 const activeObservationStarts = new Map<string, number>();
+const lastObservationFeedbackAt = new Map<string, number>();
 let lastFlowSampleAt = 0;
 let currentPhraseStartedAt = 0;
+
+function logFeedbackDebug(
+  type: FeedbackDebugEntry["type"],
+  message: string,
+) {
+  if (!feedbackDebugEnabled) return;
+  feedbackDebugEntries.value.unshift({
+    id: crypto.randomUUID(),
+    at: Date.now(),
+    type,
+    message,
+  });
+  feedbackDebugEntries.value = feedbackDebugEntries.value.slice(0, 30);
+}
 
 function createEmptyActivity(): PracticeActivityStats {
   return {
@@ -178,6 +205,9 @@ function beginSession() {
   currentPhraseStartedAt = 0;
   showPauseActions.value = false;
   activeObservationStarts.clear();
+  lastObservationFeedbackAt.clear();
+  feedbackDebugEntries.value = [];
+  logFeedbackDebug("flow", "Session started. Waiting for a clear playing phrase.");
 }
 
 function waitForCameraCheck(timeoutMs = 3500) {
@@ -333,6 +363,17 @@ function handleObservation(payload: {
   if (!practiceStore.isSessionActive) return;
   const now = payload.snapshot.capturedAt;
   if (payload.phase === "issue") {
+    if (payload.confidence < 0.84) {
+      logFeedbackDebug(
+        "suppress",
+        `${payload.key} ignored: confidence ${payload.confidence.toFixed(2)} is below 0.84.`,
+      );
+      return;
+    }
+    logFeedbackDebug(
+      "detect",
+      `${payload.key} accepted at confidence ${payload.confidence.toFixed(2)}.`,
+    );
     const existing = reviewMoments.value.find((moment) => moment.key === payload.key);
     if (existing) {
       existing.occurrences += 1;
@@ -389,7 +430,7 @@ function monitorPracticeFlow() {
     activity.value.totalPlayingSeconds += sampleSeconds;
     if (noteName.value) {
       activity.value.pitchedSeconds += sampleSeconds;
-      if (Math.abs(centsOffset.value) <= 15) {
+      if (Math.abs(centsOffset.value) <= 20) {
         activity.value.inTuneSeconds += sampleSeconds;
       }
       if (pitchStability.value >= 70) {
@@ -429,11 +470,14 @@ function monitorPracticeFlow() {
 }
 
 async function requestPauseFeedback() {
+  logFeedbackDebug("ai", "Natural pause detected. Requesting one coaching decision.");
   const message = await requestCoachMessage(reviewMoments.value, activity.value);
   if (message && !isPlaying.value && practiceStore.isSessionActive) {
+    logFeedbackDebug("ai", `AI returned feedback: ${message}`);
     showMicroFeedback(message);
     return;
   }
+  logFeedbackDebug("ai", "AI chose to stay quiet or the request was unavailable.");
   if (
     !microFeedback.value &&
     !isPlaying.value &&
@@ -445,21 +489,37 @@ async function requestPauseFeedback() {
 }
 
 function deliverPendingObservation() {
-  if (
-    !pendingObservation ||
-    Date.now() - lastMicroFeedbackAt < 8000
-  ) return;
+  if (!pendingObservation) {
+    logFeedbackDebug("suppress", "No persistent observation was waiting at this pause.");
+    return;
+  }
+  const now = Date.now();
+  if (now - lastMicroFeedbackAt < 8000) {
+    logFeedbackDebug("suppress", "Observation feedback hidden: another message was shown recently.");
+    return;
+  }
+  const lastSameFeedbackAt = lastObservationFeedbackAt.get(pendingObservation.key) ?? 0;
+  if (now - lastSameFeedbackAt < 45000) {
+    logFeedbackDebug(
+      "suppress",
+      `${pendingObservation.key} hidden: same suggestion was shown within 45 seconds.`,
+    );
+    pendingObservation = null;
+    return;
+  }
+  lastObservationFeedbackAt.set(pendingObservation.key, now);
   showMicroFeedback(pendingObservation.message);
   pendingObservation = null;
 }
 
 function showMicroFeedback(message: string) {
+  logFeedbackDebug("feedback", `Shown for 8 seconds: ${message}`);
   lastMicroFeedbackAt = Date.now();
   microFeedback.value = message;
   clearTimeout(feedbackHideTimer);
   feedbackHideTimer = window.setTimeout(() => {
     microFeedback.value = "";
-  }, 4500);
+  }, 8000);
 }
 
 function closeActiveObservations() {
@@ -575,6 +635,43 @@ function closeActiveObservations() {
             </div>
           </div>
 
+          <div
+            v-if="feedbackDebugEnabled"
+            class="absolute right-4 top-16 z-50 hidden md:block"
+          >
+            <button
+              type="button"
+              class="grid h-9 w-9 place-items-center rounded-full border border-cyan-300/30 bg-stage-950/80 text-cyan-200 backdrop-blur"
+              title="Feedback debug"
+              @click="showFeedbackDebug = !showFeedbackDebug"
+            >
+              <WrenchScrewdriverIcon class="h-4 w-4" />
+            </button>
+            <div
+              v-if="showFeedbackDebug"
+              class="absolute right-0 top-11 max-h-80 w-96 overflow-auto rounded-2xl border border-white/10 bg-stage-950/95 p-4 text-xs shadow-2xl backdrop-blur-xl"
+            >
+              <div class="flex items-center justify-between">
+                <strong class="text-white">Feedback decisions</strong>
+                <button class="text-white/45 hover:text-white" @click="feedbackDebugEntries = []">Clear</button>
+              </div>
+              <p class="mt-1 text-[11px] text-white/40">Visible only in development or with ?debug=1.</p>
+              <div class="mt-3 space-y-2">
+                <div
+                  v-for="entry in feedbackDebugEntries"
+                  :key="entry.id"
+                  class="rounded-lg bg-white/5 px-3 py-2 leading-5 text-white/65"
+                >
+                  <span class="mr-2 font-semibold uppercase text-cyan-200/80">{{ entry.type }}</span>
+                  {{ entry.message }}
+                </div>
+                <p v-if="!feedbackDebugEntries.length" class="py-4 text-center text-white/35">
+                  Start a session to inspect feedback decisions.
+                </p>
+              </div>
+            </div>
+          </div>
+
           <div class="absolute bottom-4 left-1/2 z-20 hidden w-[min(94%,46rem)] -translate-x-1/2 md:block">
             <AudioPitchMeter
               :pitch-stability="pitchStability"
@@ -588,12 +685,17 @@ function closeActiveObservations() {
 
           <div
             v-if="microFeedback"
-            class="absolute inset-x-3 bottom-[5.75rem] z-30 flex items-start gap-2.5 rounded-2xl border border-bowly-300/20 bg-stage-950/82 px-3.5 py-2.5 text-xs shadow-2xl backdrop-blur-xl md:hidden"
+            class="absolute inset-x-3 bottom-[5.75rem] z-30 overflow-hidden rounded-2xl border border-bowly-300/20 bg-stage-950/90 px-4 py-3 shadow-2xl backdrop-blur-xl md:hidden"
           >
-            <SparklesIcon class="mt-0.5 h-4 w-4 shrink-0 text-bowly-200" />
-            <div class="min-w-0">
-              <p class="text-[10px] font-semibold uppercase tracking-[0.12em] text-bowly-200/70">AI Coach</p>
-              <p class="mt-0.5 truncate text-white/85">{{ microFeedback }}</p>
+            <div class="flex items-start gap-3">
+              <SparklesIcon class="mt-0.5 h-5 w-5 shrink-0 text-bowly-200" />
+              <div class="min-w-0">
+                <p class="text-[10px] font-semibold uppercase tracking-[0.12em] text-bowly-200/70">AI Coach · next phrase</p>
+                <p class="mt-1 text-sm font-medium leading-5 text-white/90">{{ microFeedback }}</p>
+              </div>
+            </div>
+            <div class="absolute inset-x-0 bottom-0 h-0.5 bg-white/10">
+              <div class="h-full origin-left animate-[feedback-life_8s_linear_forwards] bg-bowly-300"></div>
             </div>
           </div>
 
@@ -730,3 +832,10 @@ function closeActiveObservations() {
     </div>
   </section>
 </template>
+
+<style>
+@keyframes feedback-life {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
+}
+</style>

@@ -1,12 +1,18 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import {
+  ArrowLeftIcon,
+  ArrowTrendingUpIcon,
+  CalendarDaysIcon,
+  CameraIcon,
   CheckCircleIcon,
   ClockIcon,
   EyeIcon,
   LightBulbIcon,
   MusicalNoteIcon,
   PlayCircleIcon,
+  StarIcon,
+  TrophyIcon,
 } from "@heroicons/vue/24/outline";
 import { useMemoryStore } from "../stores/memory";
 import { fetchBackendHealth, fetchParentReport } from "../services/api";
@@ -39,6 +45,149 @@ const reviewMoments = computed(() =>
     .slice(0, 3)
 );
 const primaryReview = computed(() => reviewMoments.value[0] ?? null);
+const postureMoments = computed(() =>
+  reviewMoments.value.filter((moment) => moment.category === "posture"),
+);
+const framingMoments = computed(() =>
+  reviewMoments.value.filter((moment) => moment.category !== "posture"),
+);
+const focusText = computed(() =>
+  postureMoments.value[0]?.suggestion ??
+  report.value?.tomorrowSuggestion ??
+  fallbackSuggestion.value,
+);
+const goodMoments = computed(() => {
+  const items: string[] = [];
+  if ((activity.value?.stablePitchPercent ?? 0) >= 60) items.push("Your sound stayed steady for longer.");
+  if ((activity.value?.phraseCount ?? 0) > 0) {
+    items.push(`${activity.value?.phraseCount} playing sections completed.`);
+  }
+  if (!postureMoments.value.length) items.push("No persistent posture concern was detected.");
+  return items.slice(0, 2);
+});
+const practiceStars = computed(() => {
+  let stars = 1;
+  if ((activity.value?.phraseCount ?? 0) >= 2) stars += 1;
+  if (
+    (activity.value?.stablePitchPercent ?? 0) >= 55 ||
+    (activity.value?.longestContinuousSeconds ?? 0) >= 8
+  ) stars += 1;
+  return stars;
+});
+const childSkills = computed(() => [
+  {
+    label: "Focus",
+    value: (activity.value?.phraseCount ?? 0) >= 3 ? "Great" : "Good start",
+    tone: "bg-lime-100 text-lime-800",
+  },
+  {
+    label: "Sound",
+    value: (activity.value?.stablePitchPercent ?? 0) >= 60 ? "Steady" : "Growing",
+    tone: "bg-orange-100 text-orange-800",
+  },
+  {
+    label: "Movement",
+    value: postureMoments.value.length ? "Keep trying" : "Good",
+    tone: "bg-bowly-100 text-bowly-800",
+  },
+]);
+const childWin = computed(() =>
+  goodMoments.value[0] ??
+  report.value?.memoryInsight ??
+  "You completed your practice and kept trying.",
+);
+const validSessions = computed(() =>
+  memoryStore.sessions.filter((session) => session.durationSeconds >= 10),
+);
+const recentSessions = computed(() => validSessions.value.slice(-5));
+function average(values: number[]) {
+  return values.length
+    ? values.reduce((sum, value) => sum + value, 0) / values.length
+    : 0;
+}
+function trendLabel(values: number[], unit: string) {
+  if (values.length < 3) return "Keep practising to reveal this trend";
+  const midpoint = Math.ceil(values.length / 2);
+  const early = average(values.slice(0, midpoint));
+  const later = average(values.slice(midpoint));
+  if (later > early * 1.1) return `Improving · ${Math.round(later)}${unit} recently`;
+  if (later < early * 0.9) return `Changing · ${Math.round(later)}${unit} recently`;
+  return `Steady · about ${Math.round(later)}${unit}`;
+}
+const practiceDaysLast7 = computed(() => {
+  const today = Date.now();
+  return new Set(
+    validSessions.value
+      .filter((session) => today - session.startedAt <= 7 * 24 * 60 * 60 * 1000)
+      .map((session) => new Date(session.startedAt).toDateString()),
+  ).size;
+});
+const longTermTrends = computed(() => [
+  {
+    label: "Practice habit",
+    value: `${practiceDaysLast7.value} ${practiceDaysLast7.value === 1 ? "day" : "days"} this week`,
+    detail: validSessions.value.length < 3 ? "Building a new routine" : "Short, regular sessions count",
+    icon: CalendarDaysIcon,
+    tone: "bg-bowly-50 text-bowly-700",
+  },
+  {
+    label: "Long phrases",
+    value: trendLabel(
+      recentSessions.value.map((session) => session.activity?.longestContinuousSeconds ?? 0),
+      " sec",
+    ),
+    detail: "Longest continuous playing section",
+    icon: ArrowTrendingUpIcon,
+    tone: "bg-lime-50 text-lime-700",
+  },
+  {
+    label: "Steady sound",
+    value: trendLabel(
+      recentSessions.value
+        .filter((session) => session.activity?.pitchDataQuality === "good")
+        .map((session) => session.activity?.stablePitchPercent ?? 0),
+      "%",
+    ),
+    detail: "Only sessions with enough clear pitch data",
+    icon: MusicalNoteIcon,
+    tone: "bg-orange-50 text-orange-700",
+  },
+]);
+const badges = computed(() => {
+  const sessions = validSessions.value;
+  const definitions = [
+    {
+      id: "first-session",
+      name: "First Practice",
+      description: "Completed the first Bowly session",
+      unlocked: sessions.length >= 1,
+    },
+    {
+      id: "three-sessions",
+      name: "Keep Going",
+      description: "Completed 3 practice sessions",
+      unlocked: sessions.length >= 3,
+    },
+    {
+      id: "long-phrase",
+      name: "Long Phrase",
+      description: "Played continuously for 15 seconds",
+      unlocked: sessions.some((session) => (session.activity?.longestContinuousSeconds ?? 0) >= 15),
+    },
+    {
+      id: "steady-sound",
+      name: "Steady Sound",
+      description: "Reached 70% sound stability with good data",
+      unlocked: sessions.some(
+        (session) =>
+          session.activity?.pitchDataQuality === "good" &&
+          (session.activity?.stablePitchPercent ?? 0) >= 70,
+      ),
+    },
+  ];
+  return definitions;
+});
+const unlockedBadgeCount = computed(() => badges.value.filter((badge) => badge.unlocked).length);
 function setupSuggestion(key: string) {
   if (key === "too-far") {
     return "Keep both hands visible. Only move the phone slightly closer if tracking is still unclear.";
@@ -100,6 +249,116 @@ onMounted(async () => {
 <template>
   <section class="min-h-[calc(100vh-4.5rem)] px-4 py-10 sm:px-6 lg:px-8">
     <div class="mx-auto max-w-6xl">
+      <div v-if="latestSession" class="mx-auto max-w-md md:hidden">
+        <div class="flex items-center justify-between">
+          <RouterLink to="/practice" class="grid h-10 w-10 place-items-center rounded-full bg-stone-100 text-stage-900">
+            <ArrowLeftIcon class="h-5 w-5" />
+          </RouterLink>
+          <div class="text-center">
+            <h1 class="text-lg font-semibold text-stage-950">Practice recap</h1>
+            <p class="text-xs text-stone-400">
+              {{ latestSession.durationSeconds < 60 ? "<1 min" : `${Math.round(latestSession.durationSeconds / 60)} min` }}
+            </p>
+          </div>
+          <span class="w-10"></span>
+        </div>
+
+        <section class="mt-7 rounded-3xl bg-gradient-to-br from-bowly-50 to-orange-50 p-6 text-center">
+          <div class="flex justify-center gap-2">
+            <StarIcon
+              v-for="index in 5"
+              :key="index"
+              class="h-9 w-9"
+              :class="index <= practiceStars
+                ? 'fill-orange-300 text-orange-400 drop-shadow-sm'
+                : 'fill-white/70 text-stone-200'"
+            />
+          </div>
+          <p class="mt-4 text-2xl font-semibold leading-8 text-stage-950">
+            You earned {{ practiceStars }} practice {{ practiceStars === 1 ? "star" : "stars" }}!
+          </p>
+          <p class="mt-2 text-sm leading-6 text-stone-500">
+            Stars celebrate effort, focus, and finishing your practice.
+          </p>
+        </section>
+
+        <section class="mt-5 divide-y divide-stone-100 rounded-2xl border border-stone-200 bg-white px-5">
+          <div
+            v-for="skill in childSkills"
+            :key="skill.label"
+            class="flex items-center justify-between py-4"
+          >
+            <span class="font-semibold text-stage-950">{{ skill.label }}</span>
+            <span class="rounded-full px-3 py-1 text-sm font-semibold" :class="skill.tone">
+              {{ skill.value }}
+            </span>
+          </div>
+        </section>
+
+        <section class="mt-5 rounded-2xl bg-lime-50 p-5 text-lime-950">
+          <div class="flex items-center gap-2 font-semibold">
+            <CheckCircleIcon class="h-5 w-5 text-lime-600" />
+            Your win
+          </div>
+          <p class="mt-3 text-lg font-semibold leading-7">{{ childWin }}</p>
+        </section>
+
+        <section class="mt-5 rounded-2xl bg-stage-900 p-5 text-white">
+          <p class="text-xs font-semibold uppercase tracking-[0.16em] text-bowly-200">Next mini challenge</p>
+          <p class="mt-3 text-xl font-semibold leading-7">{{ focusText }}</p>
+          <p class="mt-2 text-sm text-white/55">Try it once slowly before starting the piece.</p>
+        </section>
+
+        <section v-if="framingMoments.length" class="mt-5 rounded-2xl border border-stone-200 bg-stone-50 p-4">
+          <div class="flex items-start gap-3">
+            <CameraIcon class="mt-0.5 h-5 w-5 shrink-0 text-stone-500" />
+            <div>
+              <p class="font-semibold text-stage-950">Camera setup</p>
+              <p class="mt-1 text-sm leading-6 text-stone-500">
+                {{ framingMoments[0]?.suggestion }} No practice stars were lost.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section class="mt-6">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="section-kicker">Growing over time</p>
+              <h2 class="mt-1 text-xl font-semibold text-stage-950">Your badges</h2>
+            </div>
+            <span class="text-sm font-semibold text-bowly-600">
+              {{ unlockedBadgeCount }}/{{ badges.length }}
+            </span>
+          </div>
+          <div class="mt-4 grid grid-cols-2 gap-3">
+            <article
+              v-for="badge in badges"
+              :key="badge.id"
+              class="rounded-2xl border p-4 text-center"
+              :class="badge.unlocked
+                ? 'border-orange-200 bg-orange-50'
+                : 'border-stone-200 bg-stone-50 opacity-55'"
+            >
+              <div
+                class="mx-auto grid h-11 w-11 place-items-center rounded-full"
+                :class="badge.unlocked ? 'bg-orange-200 text-orange-700' : 'bg-stone-200 text-stone-500'"
+              >
+                <TrophyIcon class="h-6 w-6" />
+              </div>
+              <p class="mt-3 text-sm font-semibold text-stage-950">{{ badge.name }}</p>
+              <p class="mt-1 text-[11px] leading-4 text-stone-500">{{ badge.description }}</p>
+            </article>
+          </div>
+        </section>
+
+        <div class="sticky bottom-0 mt-7 flex gap-3 bg-white/90 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur">
+          <RouterLink to="/practice" class="primary-button flex-1 justify-center">Practice again</RouterLink>
+          <a href="#parent-details" class="secondary-button justify-center">Parent details</a>
+        </div>
+      </div>
+
+      <div id="parent-details" class="max-md:hidden">
       <p class="section-kicker">Progress overview</p>
       <div class="mt-3 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
@@ -146,14 +405,14 @@ onMounted(async () => {
         </article>
         <article class="light-card">
           <MusicalNoteIcon class="h-7 w-7 text-orange-500" />
-          <p class="mt-5 text-sm text-stone-500">Pitch near centre</p>
+          <p class="mt-5 text-sm text-stone-500">Near the closest standard note</p>
           <p class="mt-1 text-3xl font-semibold">
             {{ (activity?.pitchedSeconds ?? 0) >= 12 ? `${activity?.inTunePercent}%` : "—" }}
           </p>
           <p class="mt-1 text-xs text-stone-400">
             {{
               (activity?.pitchedSeconds ?? 0) >= 12
-                ? "Only while a clear pitch was detected"
+                ? "Uses a comfortable ±20 cent range"
                 : "Not enough clear pitch data"
             }}
           </p>
@@ -184,12 +443,58 @@ onMounted(async () => {
         <section class="light-card md:col-span-3">
           <div class="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
             <div>
+              <p class="section-kicker">Recent progress</p>
+              <h2 class="mt-2 text-2xl font-semibold text-stage-950">Long-term trends</h2>
+              <p class="mt-2 text-sm leading-6 text-stone-500">
+                Based on up to five recent sessions. Trends appear only after enough practice data is available.
+              </p>
+            </div>
+            <span class="text-sm text-stone-400">{{ validSessions.length }} recorded sessions</span>
+          </div>
+          <div class="mt-6 grid gap-4 md:grid-cols-3">
+            <article
+              v-for="trend in longTermTrends"
+              :key="trend.label"
+              class="rounded-2xl p-5"
+              :class="trend.tone"
+            >
+              <component :is="trend.icon" class="h-6 w-6" />
+              <p class="mt-4 text-sm font-semibold opacity-70">{{ trend.label }}</p>
+              <p class="mt-2 text-lg font-semibold leading-7">{{ trend.value }}</p>
+              <p class="mt-1 text-xs leading-5 opacity-65">{{ trend.detail }}</p>
+            </article>
+          </div>
+          <div class="mt-6 border-t border-stone-100 pt-5">
+            <div class="flex items-center justify-between">
+              <h3 class="font-semibold text-stage-950">Achievements</h3>
+              <span class="text-sm text-stone-400">{{ unlockedBadgeCount }} unlocked</span>
+            </div>
+            <div class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div
+                v-for="badge in badges"
+                :key="badge.id"
+                class="rounded-xl border p-4"
+                :class="badge.unlocked
+                  ? 'border-orange-200 bg-orange-50'
+                  : 'border-stone-200 bg-stone-50 opacity-50'"
+              >
+                <TrophyIcon class="h-5 w-5" :class="badge.unlocked ? 'text-orange-600' : 'text-stone-400'" />
+                <p class="mt-3 font-semibold text-stage-950">{{ badge.name }}</p>
+                <p class="mt-1 text-xs leading-5 text-stone-500">{{ badge.description }}</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="light-card md:col-span-3">
+          <div class="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
+            <div>
               <p class="section-kicker">Practice reflections</p>
               <h2 class="mt-2 text-2xl font-semibold text-stage-950">
-                Reliable camera-view moments
+                Practice observations
               </h2>
               <p class="mt-2 max-w-2xl text-sm leading-6 text-stone-500">
-                Only persistent, high-confidence visibility events are shown. Original video is not stored.
+                Movement suggestions and camera setup issues are explained separately. Original video is not stored.
               </p>
             </div>
             <span class="inline-flex items-center gap-2 text-sm text-lime-700">
@@ -206,6 +511,12 @@ onMounted(async () => {
             >
               <div class="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
                 <div>
+                  <p
+                    class="mb-2 text-xs font-semibold uppercase tracking-[0.16em]"
+                    :class="moment.category === 'posture' ? 'text-bowly-600' : 'text-stone-500'"
+                  >
+                    {{ moment.category === "posture" ? "Movement observation" : "Camera setup" }}
+                  </p>
                   <h3 class="text-lg font-semibold text-stage-950">{{ moment.title }}</h3>
                   <p class="mt-1 text-sm text-stone-500">
                     Seen {{ moment.occurrences }} {{ moment.occurrences === 1 ? "time" : "times" }}
@@ -215,7 +526,34 @@ onMounted(async () => {
                 <p class="max-w-md text-sm leading-6 text-stone-600">{{ moment.suggestion }}</p>
               </div>
 
-              <div class="mt-5 grid gap-4 sm:grid-cols-2">
+              <div
+                class="mt-5 rounded-xl p-4"
+                :class="moment.category === 'posture' ? 'bg-bowly-50' : 'bg-stone-100'"
+              >
+                <p class="text-sm font-semibold text-stage-950">
+                  {{
+                    moment.category === "posture"
+                      ? "What this means"
+                      : "This is a setup issue, not a movement mistake"
+                  }}
+                </p>
+                <p class="mt-2 text-sm leading-6 text-stone-600">
+                  {{
+                    moment.category === "posture"
+                      ? `Bowly saw this pattern continue for about ${moment.totalDurationSeconds} seconds.`
+                      : "The camera could not clearly see part of the playing position, so Bowly did not use it to judge the child's movement."
+                  }}
+                </p>
+                <p v-if="moment.category === 'posture'" class="mt-3 text-sm font-medium text-bowly-800">
+                  Next time: {{ moment.suggestion }}
+                </p>
+                <p v-if="moment.after" class="mt-3 flex items-center gap-2 text-sm font-medium text-lime-700">
+                  <CheckCircleIcon class="h-4 w-4" />
+                  The view or movement improved later.
+                </p>
+              </div>
+
+              <div class="hidden">
                 <div>
                   <p class="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-bowly-600">
                     Camera view to notice
@@ -244,15 +582,15 @@ onMounted(async () => {
           </div>
 
           <div v-else class="mt-7 rounded-2xl bg-lime-50 p-6 text-lime-900">
-            <p class="font-semibold">No persistent camera-view issue was recorded.</p>
+            <p class="font-semibold">No persistent movement concern was recorded.</p>
             <p class="mt-2 text-sm leading-6 text-lime-800">
-              Bowly only saves a moment when the visibility issue lasts long enough and detection is confident.
+              Bowly stays quiet when there is not enough reliable evidence for a movement suggestion.
             </p>
           </div>
         </section>
 
         <section
-          v-if="primaryReview"
+          v-if="false"
           class="rounded-2xl bg-gradient-to-br from-bowly-600 to-bowly-800 p-6 text-white shadow-sm md:col-span-3"
         >
           <p class="text-xs font-semibold uppercase tracking-[0.18em] text-bowly-100">
@@ -274,6 +612,7 @@ onMounted(async () => {
       </div>
       <p v-if="loading" class="mt-6 text-sm text-stone-500">Building gentle report...</p>
       <p v-if="errorText" class="mt-3 text-sm text-orange-700">{{ errorText }}</p>
+      </div>
     </div>
   </section>
 </template>

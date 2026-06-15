@@ -6,6 +6,20 @@ import { fileURLToPath, URL } from 'node:url'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [vue(), tailwindcss()],
+  build: {
+    rolldownOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('@tensorflow') || id.includes('pose-detection')) {
+            return 'pose-engine'
+          }
+          if (id.includes('node_modules/vue') || id.includes('node_modules/pinia')) {
+            return 'vue-core'
+          }
+        },
+      },
+    },
+  },
   resolve: {
     alias: {
       '@mediapipe/pose': fileURLToPath(
