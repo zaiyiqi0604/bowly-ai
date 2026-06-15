@@ -632,24 +632,24 @@ function closeActiveObservations() {
                 <ChevronUpIcon class="h-3.5 w-3.5 rotate-90" />
                 Controls stay hidden while you play.
               </p>
+              <button
+                v-if="feedbackDebugEnabled"
+                type="button"
+                class="mt-1 flex w-full items-center gap-2.5 rounded-xl border-t border-white/10 px-3 py-2.5 text-left text-xs text-cyan-200/80 hover:bg-white/5"
+                @click="showFeedbackDebug = !showFeedbackDebug"
+              >
+                <WrenchScrewdriverIcon class="h-4 w-4" />
+                Feedback debug
+              </button>
             </div>
           </div>
 
           <div
-            v-if="feedbackDebugEnabled"
+            v-if="feedbackDebugEnabled && showFeedbackDebug"
             class="absolute right-4 top-16 z-50 hidden md:block"
           >
-            <button
-              type="button"
-              class="grid h-9 w-9 place-items-center rounded-full border border-cyan-300/30 bg-stage-950/80 text-cyan-200 backdrop-blur"
-              title="Feedback debug"
-              @click="showFeedbackDebug = !showFeedbackDebug"
-            >
-              <WrenchScrewdriverIcon class="h-4 w-4" />
-            </button>
             <div
-              v-if="showFeedbackDebug"
-              class="absolute right-0 top-11 max-h-80 w-96 overflow-auto rounded-2xl border border-white/10 bg-stage-950/95 p-4 text-xs shadow-2xl backdrop-blur-xl"
+              class="max-h-80 w-96 overflow-auto rounded-2xl border border-white/10 bg-stage-950/95 p-4 text-xs shadow-2xl backdrop-blur-xl"
             >
               <div class="flex items-center justify-between">
                 <strong class="text-white">Feedback decisions</strong>

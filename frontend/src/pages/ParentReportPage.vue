@@ -24,6 +24,7 @@ const loading = ref(false);
 const report = ref<ParentReportResponse | null>(null);
 const aiStatus = ref<AiRuntimeStatus | null>(null);
 const errorText = ref("");
+const showParentReport = ref(false);
 const latestSession = computed(() => memoryStore.latestSession);
 const activity = computed(() => latestSession.value?.activity);
 const continuityInsight = computed(() => {
@@ -51,11 +52,22 @@ const postureMoments = computed(() =>
 const framingMoments = computed(() =>
   reviewMoments.value.filter((moment) => moment.category !== "posture"),
 );
-const focusText = computed(() =>
-  postureMoments.value[0]?.suggestion ??
-  report.value?.tomorrowSuggestion ??
-  fallbackSuggestion.value,
-);
+function shortInstruction(value: string) {
+  const sentence = value.split(/[.!?]/)[0]?.trim() || value.trim();
+  const words = sentence.split(/\s+/);
+  return words.length > 14 ? `${words.slice(0, 14).join(" ")}.` : `${sentence}.`;
+}
+const focusText = computed(() => {
+  if (postureMoments.value[0]) return shortInstruction(postureMoments.value[0].suggestion);
+  const stable = activity.value?.stablePitchPercent ?? 0;
+  if (stable < 55 && (activity.value?.pitchDataQuality ?? "insufficient") === "good") {
+    return "Play one slow note and listen for a steady sound.";
+  }
+  if ((activity.value?.longestContinuousSeconds ?? 0) < 8) {
+    return "Try one calm phrase without stopping.";
+  }
+  return "Play one favorite phrase with a relaxed shoulder.";
+});
 const goodMoments = computed(() => {
   const items: string[] = [];
   if ((activity.value?.stablePitchPercent ?? 0) >= 60) items.push("Your sound stayed steady for longer.");
@@ -65,29 +77,72 @@ const goodMoments = computed(() => {
   if (!postureMoments.value.length) items.push("No persistent posture concern was detected.");
   return items.slice(0, 2);
 });
+const previousSessions = computed(() => validSessions.value.slice(0, -1).slice(-3));
+const previousAverage = computed(() => ({
+  duration: average(previousSessions.value.map((session) => session.durationSeconds)),
+  phrase: average(
+    previousSessions.value.map((session) => session.activity?.longestContinuousSeconds ?? 0),
+  ),
+  sound: average(
+    previousSessions.value
+      .filter((session) => session.activity?.pitchDataQuality === "good")
+      .map((session) => session.activity?.stablePitchPercent ?? 0),
+  ),
+}));
+function relativeLabel(current: number, baseline: number, good: string, steady: string, growing: string) {
+  if (!baseline) return current > 0 ? steady : growing;
+  if (current >= baseline * 1.12) return good;
+  if (current >= baseline * 0.88) return steady;
+  return growing;
+}
 const practiceStars = computed(() => {
   let stars = 1;
+  if ((latestSession.value?.durationSeconds ?? 0) >= 30) stars += 1;
   if ((activity.value?.phraseCount ?? 0) >= 2) stars += 1;
   if (
-    (activity.value?.stablePitchPercent ?? 0) >= 55 ||
-    (activity.value?.longestContinuousSeconds ?? 0) >= 8
+    previousAverage.value.phrase > 0 &&
+    (activity.value?.longestContinuousSeconds ?? 0) > previousAverage.value.phrase * 1.1
   ) stars += 1;
-  return stars;
+  if (
+    activity.value?.pitchDataQuality === "good" &&
+    previousAverage.value.sound > 0 &&
+    (activity.value?.stablePitchPercent ?? 0) > previousAverage.value.sound * 1.1
+  ) stars += 1;
+  return Math.min(5, stars);
 });
 const childSkills = computed(() => [
   {
     label: "Focus",
-    value: (activity.value?.phraseCount ?? 0) >= 3 ? "Great" : "Good start",
+    value: relativeLabel(
+      latestSession.value?.durationSeconds ?? 0,
+      previousAverage.value.duration,
+      "Improved",
+      "Steady",
+      "Good start",
+    ),
     tone: "bg-lime-100 text-lime-800",
   },
   {
     label: "Sound",
-    value: (activity.value?.stablePitchPercent ?? 0) >= 60 ? "Steady" : "Growing",
+    value:
+      activity.value?.pitchDataQuality !== "good"
+        ? "Still listening"
+        : relativeLabel(
+            activity.value?.stablePitchPercent ?? 0,
+            previousAverage.value.sound,
+            "Improved",
+            "Steady",
+            "Growing",
+          ),
     tone: "bg-orange-100 text-orange-800",
   },
   {
     label: "Movement",
-    value: postureMoments.value.length ? "Keep trying" : "Good",
+    value: postureMoments.value.length
+      ? postureMoments.value.some((moment) => moment.after)
+        ? "Improved"
+        : "Next focus"
+      : "Looked comfortable",
     tone: "bg-bowly-100 text-bowly-800",
   },
 ]);
@@ -249,7 +304,7 @@ onMounted(async () => {
 <template>
   <section class="min-h-[calc(100vh-4.5rem)] px-4 py-10 sm:px-6 lg:px-8">
     <div class="mx-auto max-w-6xl">
-      <div v-if="latestSession" class="mx-auto max-w-md md:hidden">
+      <div v-if="latestSession && !showParentReport" class="mx-auto max-w-md md:hidden">
         <div class="flex items-center justify-between">
           <RouterLink to="/practice" class="grid h-10 w-10 place-items-center rounded-full bg-stone-100 text-stage-900">
             <ArrowLeftIcon class="h-5 w-5" />
@@ -354,11 +409,29 @@ onMounted(async () => {
 
         <div class="sticky bottom-0 mt-7 flex gap-3 bg-white/90 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur">
           <RouterLink to="/practice" class="primary-button flex-1 justify-center">Practice again</RouterLink>
-          <a href="#parent-details" class="secondary-button justify-center">Parent details</a>
+          <button
+            type="button"
+            class="secondary-button justify-center"
+            @click="showParentReport = true"
+          >
+            Parent report
+          </button>
         </div>
       </div>
 
-      <div id="parent-details" class="max-md:hidden">
+      <div
+        id="parent-details"
+        :class="showParentReport ? 'block' : 'max-md:hidden'"
+      >
+      <button
+        v-if="showParentReport"
+        type="button"
+        class="mb-5 inline-flex items-center gap-2 text-sm font-semibold text-bowly-700 md:hidden"
+        @click="showParentReport = false"
+      >
+        <ArrowLeftIcon class="h-4 w-4" />
+        Back to child recap
+      </button>
       <p class="section-kicker">Progress overview</p>
       <div class="mt-3 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
