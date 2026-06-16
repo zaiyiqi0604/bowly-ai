@@ -303,35 +303,47 @@ const aiStatusTone = computed(() => {
 const qwenProofText = computed(() => {
   const responseAi = report.value?.ai;
   if (responseAi?.provider === "qwen") {
-    return "AI helped turn today's practice data into this parent-friendly summary.";
+    return `Live ${responseAi.model} returned this report response with fallback disabled.`;
   }
   if (responseAi?.provider === "mock-fallback") {
-    return "Bowly used a local summary so the report stayed available.";
+    return "The cloud AI path timed out, so Bowly preserved the same report shape with a local fallback.";
   }
   if (responseAi?.provider === "mock") {
-    return "This demo uses the same report structure with stable sample data.";
+    return "Demo mode uses the same report response structure with stable sample data.";
   }
   if (aiStatus.value?.provider === "qwen") {
-    return "AI helped turn today's practice data into this parent-friendly summary.";
+    return `Health check confirms live ${aiStatus.value.model}; report POST can still fall back if it runs long.`;
   }
   if (aiStatus.value?.provider === "mock-fallback") {
-    return "Bowly used a local summary so the report stayed available.";
+    return "Health check shows the fallback path is active, keeping the demo reliable under timeout.";
   }
   if (aiStatus.value?.mode === "live" && aiStatus.value.keyConfigured) {
-    return "Bowly is ready to use AI when the cloud report finishes in time.";
+    return `${aiStatus.value.model} is configured; Bowly keeps the report usable if the cloud call is slow.`;
   }
   if (aiStatus.value?.mode === "live" && !aiStatus.value.keyConfigured) {
-    return "Bowly can still create a local practice summary while AI is being set up.";
+    return "The report contract remains usable while cloud AI credentials are being set up.";
   }
-  return "The demo keeps a stable parent report for review.";
+  return "The demo keeps a stable report contract for judges to review.";
 });
 const localSignalText = computed(() => {
   const phraseCount = activity.value?.phraseCount ?? 0;
   const longest = Math.round(activity.value?.longestContinuousSeconds ?? 0);
-  if (phraseCount > 0 && longest > 0) {
-    return `${phraseCount} playing sections captured locally; longest phrase ${longest} sec.`;
+  const reviewCount = reviewMoments.value.length;
+  const pitchQuality = activity.value?.pitchDataQuality ?? "insufficient";
+  const parts = [
+    `${phraseCount} playing sections`,
+    longest > 0 ? `longest ${longest} sec` : "no long phrase yet",
+    `${reviewCount} private review ${reviewCount === 1 ? "moment" : "moments"}`,
+    `${pitchQuality} pitch data`,
+  ];
+  return `${parts.join("; ")}. Raw media is not stored.`;
+});
+const familyProofText = computed(() => {
+  const suggestion = report.value?.tomorrowSuggestion ?? fallbackSuggestion.value;
+  if (report.value?.summary) {
+    return `Structured signals become a parent summary plus one next step: ${suggestion}`;
   }
-  return "Camera and microphone signals are summarized locally before any optional AI summary.";
+  return `Even without a cloud report response, Bowly still gives one safe next step: ${suggestion}`;
 });
 const aiStatusTooltip = computed(() => {
   if (aiStatus.value?.provider === "qwen") return "The cloud AI summary completed successfully.";
@@ -538,9 +550,9 @@ onMounted(async () => {
       <div v-else class="mt-8 rounded-3xl border border-bowly-100 bg-white p-5 shadow-sm sm:p-6">
         <div class="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
           <div>
-            <p class="section-kicker">Privacy & AI proof</p>
+            <p class="section-kicker">Hackathon judge proof</p>
             <h2 class="mt-2 text-2xl font-semibold text-stage-950">
-              Bowly turns private on-device observations into a family-friendly practice note.
+              Private practice signals become an AI-ready parent report without storing raw media.
             </h2>
           </div>
           <span class="inline-flex items-center gap-2 rounded-full bg-lime-50 px-3 py-1.5 text-xs font-semibold text-lime-800 ring-1 ring-lime-200">
@@ -551,18 +563,18 @@ onMounted(async () => {
         <div class="mt-5 grid gap-3 md:grid-cols-3">
           <article class="rounded-2xl bg-bowly-50 p-4">
             <CameraIcon class="h-6 w-6 text-bowly-700" />
-            <p class="mt-3 text-sm font-semibold text-stage-950">What Bowly noticed on this device</p>
+            <p class="mt-3 text-sm font-semibold text-stage-950">Local perception payload</p>
             <p class="mt-1 text-sm leading-6 text-stone-600">{{ localSignalText }}</p>
           </article>
           <article class="rounded-2xl bg-orange-50 p-4">
             <LightBulbIcon class="h-6 w-6 text-orange-600" />
-            <p class="mt-3 text-sm font-semibold text-stage-950">AI-written parent summary</p>
+            <p class="mt-3 text-sm font-semibold text-stage-950">AI or fallback path</p>
             <p class="mt-1 text-sm leading-6 text-stone-600">{{ qwenProofText }}</p>
           </article>
           <article class="rounded-2xl bg-lime-50 p-4">
             <CheckCircleIcon class="h-6 w-6 text-lime-700" />
-            <p class="mt-3 text-sm font-semibold text-stage-950">One thing to try next</p>
-            <p class="mt-1 text-sm leading-6 text-stone-600">{{ report?.tomorrowSuggestion ?? fallbackSuggestion }}</p>
+            <p class="mt-3 text-sm font-semibold text-stage-950">Family-safe output</p>
+            <p class="mt-1 text-sm leading-6 text-stone-600">{{ familyProofText }}</p>
           </article>
         </div>
       </div>
