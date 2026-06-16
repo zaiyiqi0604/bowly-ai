@@ -26,6 +26,7 @@ export interface CoachResponse {
   action: "stay_quiet" | "micro_feedback";
   message: string;
   focus: "effort" | "pitch" | "posture" | "continuity";
+  ai?: AiResponseMeta;
 }
 
 export interface ParentReportResponse {
@@ -34,11 +35,13 @@ export interface ParentReportResponse {
   motivationLevel: "low" | "medium" | "high";
   tomorrowSuggestion: string;
   memoryInsight: string;
+  ai?: AiResponseMeta;
 }
 
 export interface MemorySummaryResponse {
   summary: string;
   trend: string;
+  ai?: AiResponseMeta;
 }
 
 export interface AiRuntimeStatus {
@@ -47,6 +50,14 @@ export interface AiRuntimeStatus {
   keyConfigured: boolean;
   model: string;
   lastRequestAt?: number;
+  lastError?: string;
+}
+
+export interface AiResponseMeta {
+  mode: "mock" | "live";
+  provider: "mock" | "qwen" | "mock-fallback";
+  model: string;
+  fallbackUsed: boolean;
   lastError?: string;
 }
 

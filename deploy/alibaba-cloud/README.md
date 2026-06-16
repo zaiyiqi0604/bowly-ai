@@ -237,6 +237,21 @@ Reload `/health`. It must show:
 "provider": "qwen"
 ```
 
+Function Compute can route `/coach` and `/health` to different warm instances,
+so the most reliable proof is the POST response itself. A successful live AI
+request includes non-sensitive response metadata:
+
+```json
+"ai": {
+  "mode": "live",
+  "provider": "qwen",
+  "model": "qwen3.7-plus",
+  "fallbackUsed": false
+}
+```
+
+If `provider` is `mock-fallback`, inspect `lastError` in the same response.
+
 ## 6. Connect The Frontend
 
 Set the production frontend environment before building:

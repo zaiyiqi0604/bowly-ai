@@ -1,3 +1,5 @@
+export type AiProvider = "mock" | "qwen" | "mock-fallback";
+
 export interface CoachRequest {
   childName: string;
   practiceMode: "assignment" | "free";
@@ -40,3 +42,15 @@ export interface MemorySummaryResponse {
   summary: string;
   trend: string;
 }
+
+export interface AiResponseMeta {
+  mode: "mock" | "live";
+  provider: "mock" | "qwen" | "mock-fallback";
+  model: string;
+  fallbackUsed: boolean;
+  lastError?: string;
+}
+
+export type WithAiMeta<T> = T & {
+  ai: AiResponseMeta;
+};

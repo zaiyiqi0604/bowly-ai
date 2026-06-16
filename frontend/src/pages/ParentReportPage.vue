@@ -281,6 +281,16 @@ const aiStatusTone = computed(() => {
   return "bg-stone-100 text-stone-600 ring-stone-200";
 });
 const qwenProofText = computed(() => {
+  const responseAi = report.value?.ai;
+  if (responseAi?.provider === "qwen") {
+    return `This report response came from live Qwen (${responseAi.model}).`;
+  }
+  if (responseAi?.provider === "mock-fallback") {
+    return `Qwen fallback was used for this report: ${responseAi.lastError ?? "provider unavailable"}.`;
+  }
+  if (responseAi?.provider === "mock") {
+    return "This report response used mock mode while preserving the same report contract.";
+  }
   if (aiStatus.value?.provider === "qwen") {
     return "Live Qwen converted structured practice signals into this parent reflection.";
   }

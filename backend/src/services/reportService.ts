@@ -1,10 +1,10 @@
-import type { ParentReportResponse } from "../types/ai.js";
+import type { ParentReportResponse, WithAiMeta } from "../types/ai.js";
 import type { PracticeSessionRecord } from "../types/session.js";
 
 export function withDurationLine(
   session: PracticeSessionRecord,
-  report: ParentReportResponse
-): ParentReportResponse {
+  report: WithAiMeta<ParentReportResponse>
+): WithAiMeta<ParentReportResponse> {
   const minutes = Math.max(1, Math.round(session.durationSeconds / 60));
   const minuteLabel = minutes === 1 ? "minute" : "minutes";
   const durationLine =

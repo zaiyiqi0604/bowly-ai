@@ -1,8 +1,11 @@
 import type {
   CoachRequest,
   CoachResponse,
+  AiProvider,
+  AiResponseMeta,
   MemorySummaryResponse,
   ParentReportResponse,
+  WithAiMeta,
 } from "../types/ai.js";
 import type { PracticeSessionRecord } from "../types/session.js";
 import {
@@ -16,7 +19,7 @@ import {
   createQwenParentReport,
 } from "./qwenService.js";
 
-export type AiProvider = "mock" | "qwen" | "mock-fallback";
+export type { AiProvider } from "../types/ai.js";
 
 export interface AiRuntimeStatus {
   mode: "mock" | "live";
@@ -63,63 +66,91 @@ function recordSuccess(provider: AiProvider) {
 }
 
 function recordFallback(error: unknown) {
+  const lastError = error instanceof Error ? error.message : "Unknown Qwen error";
   runtimeStatus = {
     provider: "mock-fallback",
     lastRequestAt: Date.now(),
-    lastError: error instanceof Error ? error.message : "Unknown Qwen error",
+    lastError,
+  };
+  return lastError;
+}
+
+function createResponseMeta(
+  provider: AiProvider,
+  fallbackUsed: boolean,
+  lastError?: string
+): AiResponseMeta {
+  return {
+    mode: shouldUseMockMode() ? "mock" : "live",
+    provider,
+    model: process.env.QWEN_MODEL ?? "qwen-plus",
+    fallbackUsed,
+    lastError,
+  };
+}
+
+function withAiMeta<T>(
+  response: T,
+  provider: AiProvider,
+  fallbackUsed = false,
+  lastError?: string
+): WithAiMeta<T> {
+  return {
+    ...response,
+    ai: createResponseMeta(provider, fallbackUsed, lastError),
   };
 }
 
 export async function generateCoachFeedback(
   payload: CoachRequest
-): Promise<CoachResponse> {
+): Promise<WithAiMeta<CoachResponse>> {
   if (shouldUseMockMode()) {
     recordSuccess("mock");
-    return createMockCoachResponse(payload);
+    return withAiMeta(createMockCoachResponse(payload), "mock");
   }
   try {
     const response = await createQwenCoachResponse(payload);
     recordSuccess("qwen");
-    return response;
+    return withAiMeta(response, "qwen");
   } catch (error) {
     console.error("Qwen coach failed, falling back to mock.", error);
-    recordFallback(error);
-    return createMockCoachResponse(payload);
+    const lastError = recordFallback(error);
+    return withAiMeta(createMockCoachResponse(payload), "mock-fallback", true, lastError);
   }
 }
 
 export async function generateParentReport(
   payload: PracticeSessionRecord
-): Promise<ParentReportResponse> {
+): Promise<WithAiMeta<ParentReportResponse>> {
   if (shouldUseMockMode()) {
     recordSuccess("mock");
-    return createMockParentReport(payload);
+    return withAiMeta(createMockParentReport(payload), "mock");
   }
   try {
     const response = await createQwenParentReport(payload);
     recordSuccess("qwen");
-    return response;
+    return withAiMeta(response, "qwen");
   } catch (error) {
     console.error("Qwen report failed, falling back to mock.", error);
-    recordFallback(error);
-    return createMockParentReport(payload);
+    const lastError = recordFallback(error);
+    return withAiMeta(createMockParentReport(payload), "mock-fallback", true, lastError);
   }
 }
 
 export async function generateMemorySummary(
   sessions: PracticeSessionRecord[]
-): Promise<MemorySummaryResponse> {
+): Promise<WithAiMeta<MemorySummaryResponse>> {
   if (shouldUseMockMode()) {
     recordSuccess("mock");
-    return createMockMemorySummary(sessions);
+    return withAiMeta(createMockMemorySummary(sessions), "mock");
   }
   try {
     const response = await createQwenMemorySummary(sessions);
     recordSuccess("qwen");
-    return response;
+    return withAiMeta(response, "qwen");
   } catch (error) {
     console.error("Qwen memory failed, falling back to mock.", error);
-    recordFallback(error);
-    return createMockMemorySummary(sessions);
+    const lastError = recordFallback(error);
+    return withAiMeta(createMockMemorySummary(sessions), "mock-fallback", true, lastError);
   }
 }
