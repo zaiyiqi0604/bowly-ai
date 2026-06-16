@@ -8,6 +8,7 @@ import type {
   ParentReportResponse,
 } from "../types/ai.js";
 import type { PracticeSessionRecord } from "../types/session.js";
+import { normalizeMotivationLevel } from "./reportNormalize.js";
 
 const CoachSchema = z.object({
   action: z.enum(["stay_quiet", "micro_feedback"]),
@@ -18,7 +19,10 @@ const CoachSchema = z.object({
 const ParentReportSchema = z.object({
   summary: z.string(),
   postureInsight: z.string(),
-  motivationLevel: z.enum(["low", "medium", "high"]),
+  motivationLevel: z.preprocess(
+    normalizeMotivationLevel,
+    z.enum(["low", "medium", "high"])
+  ),
   tomorrowSuggestion: z.string(),
   memoryInsight: z.string(),
 });
@@ -139,6 +143,7 @@ export async function createQwenParentReport(
     `Return compact JSON for a parent violin practice report.
 Fields: summary, postureInsight, motivationLevel, tomorrowSuggestion, memoryInsight.
 Rules: use only input facts; no invented emotion/progress; framing means camera view only; keep each field one short sentence.
+motivationLevel must be exactly one word: low, medium, or high (no other values or phrases).
 Input: ${JSON.stringify(compactInput)}`,
     {
       model: process.env.QWEN_REPORT_MODEL ?? "qwen3.6-flash",
