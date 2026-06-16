@@ -28,6 +28,17 @@ export interface AiRuntimeStatus {
   model: string;
   lastRequestAt?: number;
   lastError?: string;
+  calls: Record<AiOperation, AiCallStatus>;
+}
+
+export type AiOperation = "coach" | "report" | "memory";
+
+export interface AiCallStatus {
+  provider: AiProvider;
+  lastRequestAt?: number;
+  lastError?: string;
+  durationMs?: number;
+  fallbackUsed?: boolean;
 }
 
 let runtimeStatus: Pick<
@@ -35,6 +46,11 @@ let runtimeStatus: Pick<
   "provider" | "lastRequestAt" | "lastError"
 > = {
   provider: "mock",
+};
+let callStatus: Record<AiOperation, AiCallStatus> = {
+  coach: { provider: "mock" },
+  report: { provider: "mock" },
+  memory: { provider: "mock" },
 };
 
 function shouldUseMockMode() {
@@ -54,23 +70,44 @@ export function getAiRuntimeStatus(): AiRuntimeStatus {
       !mockMode && !keyConfigured
         ? "Live mode is enabled but QWEN_API_KEY is not configured."
         : runtimeStatus.lastError,
+    calls: callStatus,
   };
 }
 
-function recordSuccess(provider: AiProvider) {
+function recordSuccess(provider: AiProvider, operation: AiOperation, durationMs?: number) {
   runtimeStatus = {
     provider,
     lastRequestAt: Date.now(),
     lastError: undefined,
   };
+  callStatus = {
+    ...callStatus,
+    [operation]: {
+      provider,
+      lastRequestAt: runtimeStatus.lastRequestAt,
+      durationMs,
+      fallbackUsed: false,
+      lastError: undefined,
+    },
+  };
 }
 
-function recordFallback(error: unknown) {
+function recordFallback(error: unknown, operation: AiOperation, durationMs?: number) {
   const lastError = error instanceof Error ? error.message : "Unknown Qwen error";
   runtimeStatus = {
     provider: "mock-fallback",
     lastRequestAt: Date.now(),
     lastError,
+  };
+  callStatus = {
+    ...callStatus,
+    [operation]: {
+      provider: "mock-fallback",
+      lastRequestAt: runtimeStatus.lastRequestAt,
+      lastError,
+      durationMs,
+      fallbackUsed: true,
+    },
   };
   return lastError;
 }
@@ -115,16 +152,17 @@ export async function generateCoachFeedback(
   payload: CoachRequest
 ): Promise<WithAiMeta<CoachResponse>> {
   if (shouldUseMockMode()) {
-    recordSuccess("mock");
+    recordSuccess("mock", "coach");
     return withAiMeta(createMockCoachResponse(payload), "mock");
   }
+  const startedAt = Date.now();
   try {
     const response = await createQwenCoachResponse(payload);
-    recordSuccess("qwen");
+    recordSuccess("qwen", "coach", Date.now() - startedAt);
     return withAiMeta(response, "qwen");
   } catch (error) {
     console.error("Qwen coach failed, falling back to mock.", error);
-    const lastError = recordFallback(error);
+    const lastError = recordFallback(error, "coach", Date.now() - startedAt);
     return withAiMeta(createMockCoachResponse(payload), "mock-fallback", true, lastError);
   }
 }
@@ -133,9 +171,10 @@ export async function generateParentReport(
   payload: PracticeSessionRecord
 ): Promise<WithAiMeta<ParentReportResponse>> {
   if (shouldUseMockMode()) {
-    recordSuccess("mock");
+    recordSuccess("mock", "report");
     return withAiMeta(createMockParentReport(payload), "mock");
   }
+  const startedAt = Date.now();
   try {
     const response = await Promise.race([
       createQwenParentReport(payload),
@@ -144,11 +183,11 @@ export async function generateParentReport(
         "Qwen report timed out before the report response deadline."
       ),
     ]);
-    recordSuccess("qwen");
+    recordSuccess("qwen", "report", Date.now() - startedAt);
     return withAiMeta(response, "qwen");
   } catch (error) {
     console.error("Qwen report failed, falling back to mock.", error);
-    const lastError = recordFallback(error);
+    const lastError = recordFallback(error, "report", Date.now() - startedAt);
     return withAiMeta(createMockParentReport(payload), "mock-fallback", true, lastError);
   }
 }
@@ -157,16 +196,17 @@ export async function generateMemorySummary(
   sessions: PracticeSessionRecord[]
 ): Promise<WithAiMeta<MemorySummaryResponse>> {
   if (shouldUseMockMode()) {
-    recordSuccess("mock");
+    recordSuccess("mock", "memory");
     return withAiMeta(createMockMemorySummary(sessions), "mock");
   }
+  const startedAt = Date.now();
   try {
     const response = await createQwenMemorySummary(sessions);
-    recordSuccess("qwen");
+    recordSuccess("qwen", "memory", Date.now() - startedAt);
     return withAiMeta(response, "qwen");
   } catch (error) {
     console.error("Qwen memory failed, falling back to mock.", error);
-    const lastError = recordFallback(error);
+    const lastError = recordFallback(error, "memory", Date.now() - startedAt);
     return withAiMeta(createMockMemorySummary(sessions), "mock-fallback", true, lastError);
   }
 }

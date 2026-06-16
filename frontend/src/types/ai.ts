@@ -51,6 +51,7 @@ export interface AiRuntimeStatus {
   model: string;
   lastRequestAt?: number;
   lastError?: string;
+  calls?: Record<"coach" | "report" | "memory", AiCallStatus>;
 }
 
 export interface AiResponseMeta {
@@ -59,6 +60,14 @@ export interface AiResponseMeta {
   model: string;
   fallbackUsed: boolean;
   lastError?: string;
+}
+
+export interface AiCallStatus {
+  provider: "mock" | "qwen" | "mock-fallback";
+  lastRequestAt?: number;
+  lastError?: string;
+  durationMs?: number;
+  fallbackUsed?: boolean;
 }
 
 export interface BackendHealthResponse {

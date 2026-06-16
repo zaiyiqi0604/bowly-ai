@@ -306,10 +306,14 @@ const qwenProofText = computed(() => {
     return `Live ${responseAi.model} returned this report response with fallback disabled.`;
   }
   if (responseAi?.provider === "mock-fallback") {
-    return "The cloud AI path timed out, so Bowly preserved the same report shape with a local fallback.";
+    return `Qwen did not return this report: ${responseAi.lastError ?? "provider unavailable"}`;
   }
   if (responseAi?.provider === "mock") {
     return "Demo mode uses the same report response structure with stable sample data.";
+  }
+  const reportCall = aiStatus.value?.calls?.report;
+  if (reportCall?.provider === "mock-fallback") {
+    return `Last report used fallback: ${reportCall.lastError ?? "provider unavailable"}`;
   }
   if (aiStatus.value?.provider === "qwen") {
     return `Health check confirms live ${aiStatus.value.model}; report POST can still fall back if it runs long.`;

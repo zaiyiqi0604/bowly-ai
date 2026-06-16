@@ -11,7 +11,7 @@ export function withDurationLine(
     `${session.childName} practiced for ${minutes} ${minuteLabel} today.`;
   const escapedName = session.childName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const existingDurationLine = new RegExp(
-    `^${escapedName} practiced for \\d+ minutes? today\\.\\s*`,
+    `^${escapedName} practi[cs]ed for \\d+ minutes? today\\.\\s*`,
     "i"
   );
   const summary = report.summary.trim().replace(existingDurationLine, "");
