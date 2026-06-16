@@ -325,19 +325,6 @@ const qwenProofText = computed(() => {
   }
   return "The demo keeps a stable report contract for judges to review.";
 });
-const localSignalText = computed(() => {
-  const phraseCount = activity.value?.phraseCount ?? 0;
-  const longest = Math.round(activity.value?.longestContinuousSeconds ?? 0);
-  const reviewCount = reviewMoments.value.length;
-  const pitchQuality = activity.value?.pitchDataQuality ?? "insufficient";
-  const parts = [
-    `${phraseCount} playing sections`,
-    longest > 0 ? `longest ${longest} sec` : "no long phrase yet",
-    `${reviewCount} private review ${reviewCount === 1 ? "moment" : "moments"}`,
-    `${pitchQuality} pitch data`,
-  ];
-  return `${parts.join("; ")}. Raw media is not stored.`;
-});
 const familyProofText = computed(() => {
   const suggestion = report.value?.tomorrowSuggestion ?? fallbackSuggestion.value;
   if (report.value?.summary) {
@@ -345,6 +332,49 @@ const familyProofText = computed(() => {
   }
   return `Even without a cloud report response, Bowly still gives one safe next step: ${suggestion}`;
 });
+const proofStats = computed(() => {
+  const phraseCount = activity.value?.phraseCount ?? 0;
+  const longest = Math.round(activity.value?.longestContinuousSeconds ?? 0);
+  const reviewCount = reviewMoments.value.length;
+  const pitchQuality = activity.value?.pitchDataQuality ?? "insufficient";
+  return [
+    {
+      label: "Sections",
+      value: `${phraseCount}`,
+      detail: "local playing segments",
+      tone: "bg-bowly-50 text-bowly-800",
+      icon: PlayCircleIcon,
+    },
+    {
+      label: "Longest phrase",
+      value: longest > 0 ? `${longest}s` : "--",
+      detail: "continuous playing",
+      tone: "bg-lime-50 text-lime-800",
+      icon: ClockIcon,
+    },
+    {
+      label: "Private moments",
+      value: `${reviewCount}`,
+      detail: `${pitchQuality} pitch data`,
+      tone: "bg-orange-50 text-orange-800",
+      icon: EyeIcon,
+    },
+  ];
+});
+const aiProofSteps = computed(() => [
+  {
+    label: "Local signals",
+    detail: "camera, pitch, pauses",
+  },
+  {
+    label: report.value?.ai?.provider === "qwen" ? "Live Qwen" : "Qwen / fallback",
+    detail: report.value?.ai?.provider === "qwen" ? "cloud response used" : "same report shape",
+  },
+  {
+    label: "Parent note",
+    detail: "summary plus next step",
+  },
+]);
 const aiStatusTooltip = computed(() => {
   if (aiStatus.value?.provider === "qwen") return "The cloud AI summary completed successfully.";
   if (aiStatus.value?.provider === "mock-fallback") {
@@ -547,37 +577,88 @@ onMounted(async () => {
         <p class="mt-2 text-sm text-stone-500">Complete a practice session to create the first report.</p>
       </div>
 
-      <div v-else class="mt-8 rounded-3xl border border-bowly-100 bg-white p-5 shadow-sm sm:p-6">
-        <div class="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
-          <div>
-            <p class="section-kicker">Hackathon judge proof</p>
-            <h2 class="mt-2 text-2xl font-semibold text-stage-950">
-              Private practice signals become an AI-ready parent report without storing raw media.
+      <section v-else class="mt-8">
+        <div class="grid gap-5 lg:grid-cols-[1.05fr_1.95fr]">
+          <article class="rounded-3xl bg-stage-950 p-6 text-white shadow-sm sm:p-7">
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-bowly-200">
+              Hackathon demo proof
+            </p>
+            <h2 class="mt-4 text-3xl font-semibold leading-tight">
+              Private practice signals become an AI-ready parent report.
             </h2>
+            <p class="mt-4 text-sm leading-7 text-white/65">
+              Edge perception stays on device, Qwen or a local fallback writes the family summary,
+              and raw video/audio is not stored.
+            </p>
+            <div class="mt-6 flex flex-wrap gap-2">
+              <span class="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white ring-1 ring-white/15">
+                <span class="h-2 w-2 rounded-full bg-lime-300"></span>
+                {{ aiStatusLabel }}
+              </span>
+              <span class="inline-flex items-center gap-2 rounded-full bg-lime-300/15 px-3 py-1.5 text-xs font-semibold text-lime-100 ring-1 ring-lime-200/25">
+                <EyeIcon class="h-4 w-4" />
+                No raw media stored
+              </span>
+            </div>
+          </article>
+
+          <div class="grid gap-4 md:grid-cols-3">
+            <article
+              v-for="stat in proofStats"
+              :key="stat.label"
+              class="rounded-3xl p-5 shadow-sm ring-1 ring-inset ring-black/5"
+              :class="stat.tone"
+            >
+              <component :is="stat.icon" class="h-7 w-7" />
+              <p class="mt-5 text-xs font-semibold uppercase tracking-[0.14em] opacity-65">
+                {{ stat.label }}
+              </p>
+              <p class="mt-2 text-4xl font-semibold leading-none">{{ stat.value }}</p>
+              <p class="mt-2 text-sm leading-6 opacity-75">{{ stat.detail }}</p>
+            </article>
           </div>
-          <span class="inline-flex items-center gap-2 rounded-full bg-lime-50 px-3 py-1.5 text-xs font-semibold text-lime-800 ring-1 ring-lime-200">
-            <EyeIcon class="h-4 w-4" />
-            No raw video or audio stored
-          </span>
         </div>
-        <div class="mt-5 grid gap-3 md:grid-cols-3">
-          <article class="rounded-2xl bg-bowly-50 p-4">
-            <CameraIcon class="h-6 w-6 text-bowly-700" />
-            <p class="mt-3 text-sm font-semibold text-stage-950">Local perception payload</p>
-            <p class="mt-1 text-sm leading-6 text-stone-600">{{ localSignalText }}</p>
+
+        <div class="mt-5 grid gap-5 lg:grid-cols-[1.4fr_1fr]">
+          <article class="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm sm:p-6">
+            <div class="flex flex-col justify-between gap-4 md:flex-row md:items-start">
+              <div>
+                <p class="section-kicker">AI report path</p>
+                <h3 class="mt-2 text-2xl font-semibold text-stage-950">
+                  Local signals become a stable parent note.
+                </h3>
+                <p class="mt-2 max-w-2xl text-sm leading-6 text-stone-500">
+                  {{ qwenProofText }}
+                </p>
+              </div>
+              <span class="inline-flex items-center gap-2 rounded-full bg-lime-50 px-3 py-1.5 text-xs font-semibold text-lime-800 ring-1 ring-lime-200">
+                <CheckCircleIcon class="h-4 w-4" />
+                fallback ready
+              </span>
+            </div>
+            <div class="mt-6 grid gap-3 md:grid-cols-3">
+              <div
+                v-for="step in aiProofSteps"
+                :key="step.label"
+                class="rounded-2xl bg-stone-50 p-4"
+              >
+                <p class="text-sm font-semibold text-stage-950">{{ step.label }}</p>
+                <p class="mt-1 text-sm leading-6 text-stone-500">{{ step.detail }}</p>
+              </div>
+            </div>
           </article>
-          <article class="rounded-2xl bg-orange-50 p-4">
-            <LightBulbIcon class="h-6 w-6 text-orange-600" />
-            <p class="mt-3 text-sm font-semibold text-stage-950">AI or fallback path</p>
-            <p class="mt-1 text-sm leading-6 text-stone-600">{{ qwenProofText }}</p>
-          </article>
-          <article class="rounded-2xl bg-lime-50 p-4">
-            <CheckCircleIcon class="h-6 w-6 text-lime-700" />
-            <p class="mt-3 text-sm font-semibold text-stage-950">Family-safe output</p>
-            <p class="mt-1 text-sm leading-6 text-stone-600">{{ familyProofText }}</p>
+
+          <article class="rounded-3xl bg-lime-50 p-6 text-lime-950 shadow-sm ring-1 ring-inset ring-lime-200">
+            <CheckCircleIcon class="h-7 w-7 text-lime-700" />
+            <p class="mt-5 text-xs font-semibold uppercase tracking-[0.14em] text-lime-700">
+              Family-safe output
+            </p>
+            <p class="mt-3 text-lg font-semibold leading-7">
+              {{ familyProofText }}
+            </p>
           </article>
         </div>
-      </div>
+      </section>
 
       <div v-if="latestSession" class="mt-5 grid gap-5 md:grid-cols-3">
         <article class="light-card">

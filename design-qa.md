@@ -1,36 +1,37 @@
-# Design QA
+**Findings**
+- No P0/P1/P2 findings remain.
 
-Source visual truth: Steve Jobs direction, concept 3 generated in this thread.
-Target: `http://127.0.0.1:5173/practice`
-Viewport: mobile portrait
-State: remembered task and first-use empty state
-
-**Implemented**
-
-- Removed the visible Teacher Task / Free Practice mode selection.
-- Added one primary Start Practice action.
-- Added a remembered-task state with optional score thumbnail.
-- Added Change today's practice and Just play secondary actions.
-- Added a compact task editor with text and camera/photo input.
-- Persisted the task and compressed score image in local browser storage.
-- Preserved the internal assignment/free state required by reports and AI requests.
-
-**Verification**
-
-- TypeScript and production build: passed.
-- Diff whitespace validation: passed.
-- Browser visual and interaction comparison: blocked because the installed in-app Browser plugin is missing its required `scripts/browser-client.mjs` runtime.
+**Evidence**
+- Source visual truth path: `C:\Users\Administrator\.codex\generated_images\019ece08-9554-76b3-b1d0-17862ef568f2\ig_049934fb2112074b016a30fc95859c81938f09585b19a103bd.png`
+- Implementation screenshot path: `D:\hackathon\bowly-ai\tmp\report-judge-proof-implementation.png`
+- Viewport: desktop 1280x720
+- State: `/demo?seed=report` redirected to `/report` with seeded report data
+- Full-view comparison evidence: the implementation now has a judge-first proof hero, three large proof metrics, an AI report path section, and a family-safe output section above the practice report content.
+- Focused region comparison evidence: the first viewport was inspected for title hierarchy, proof metrics, AI path visibility, and horizontal overflow. No focused crop was needed because the relevant first-viewport components are visible and readable in the desktop screenshot.
 
 **Required Fidelity Surfaces**
+- Fonts and typography: existing Bowly typography is preserved. The new proof hero uses stronger display hierarchy with readable line lengths and no observed text clipping.
+- Spacing and layout rhythm: the first viewport now follows the approved mock direction with a dark proof hero, adjacent proof metric tiles, and a second proof row. No horizontal overflow was detected on desktop or mobile width.
+- Colors and visual tokens: existing Bowly tokens are reused: dark stage panel, bowly purple, lime, orange, white cards, and restrained shadows.
+- Image quality and asset fidelity: no new raster assets were required. Existing icon library components are reused. Anonymous pose snapshot rendering is unchanged.
+- Copy and content: first-viewport copy now emphasizes the hackathon proof chain: local perception, AI/fallback path, privacy, and family-safe output.
 
-- Typography: implemented with the existing Bowly type scale and tokens.
-- Spacing and hierarchy: implemented around one primary action and two quiet secondary actions.
-- Colors: existing Bowly violet, stage surfaces, and muted text tokens retained.
-- Assets: existing Heroicons and an uploaded score thumbnail are used; no placeholder artwork was introduced.
-- Copy: mode terminology is removed from the child-facing start state.
+**Patches Made**
+- Replaced the previous three-card proof strip with a judge-first proof hero.
+- Added proof metric cards for sections, longest phrase, and private moments.
+- Added an AI report path section showing local signals, Qwen/fallback, and parent note.
+- Added a stronger family-safe output proof panel.
 
-**Remaining Blocker**
+**Implementation Checklist**
+- Desktop report route renders the new judge-first proof hero.
+- `/demo?seed=report` redirects to `/report`.
+- Desktop horizontal overflow: none observed.
+- Mobile horizontal overflow: none observed; mobile still follows the existing child-recap-first flow.
+- `npm.cmd run typecheck --prefix frontend`: passed.
+- `npm.cmd run build --prefix frontend`: passed.
 
-- A rendered browser capture is required to compare the implementation against concept 3 at the same mobile viewport.
+**Follow-up Polish**
+- P3: mobile could get its own judge proof entry point instead of keeping the existing child recap first.
+- P3: the practice metrics could be visually grouped under a `Today's Practice Report` subheading if the next design iteration needs clearer separation.
 
-final result: blocked
+final result: passed
