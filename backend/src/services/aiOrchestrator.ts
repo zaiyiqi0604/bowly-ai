@@ -101,6 +101,16 @@ function withAiMeta<T>(
   };
 }
 
+function timeoutAfter<T>(milliseconds: number, message: string): Promise<T> {
+  return new Promise((_, reject) => {
+    setTimeout(() => reject(new Error(message)), milliseconds);
+  });
+}
+
+function getReportQwenTimeoutMs() {
+  return Number(process.env.REPORT_QWEN_TIMEOUT_MS ?? 8000);
+}
+
 export async function generateCoachFeedback(
   payload: CoachRequest
 ): Promise<WithAiMeta<CoachResponse>> {
@@ -127,7 +137,13 @@ export async function generateParentReport(
     return withAiMeta(createMockParentReport(payload), "mock");
   }
   try {
-    const response = await createQwenParentReport(payload);
+    const response = await Promise.race([
+      createQwenParentReport(payload),
+      timeoutAfter<ParentReportResponse>(
+        getReportQwenTimeoutMs(),
+        "Qwen report timed out before the report response deadline."
+      ),
+    ]);
     recordSuccess("qwen");
     return withAiMeta(response, "qwen");
   } catch (error) {

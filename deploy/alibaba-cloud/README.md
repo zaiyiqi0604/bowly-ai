@@ -53,6 +53,8 @@ USE_MOCK_AI=false
 QWEN_API_KEY=<set in Function Compute only>
 QWEN_BASE_URL=https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1
 QWEN_MODEL=qwen3.7-plus
+QWEN_TIMEOUT_MS=12000
+REPORT_QWEN_TIMEOUT_MS=8000
 ```
 
 Do not upload `backend/.env`, and do not paste the key into source code.
@@ -165,6 +167,8 @@ USE_MOCK_AI=false
 QWEN_API_KEY=<set in SAE only>
 QWEN_BASE_URL=https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1
 QWEN_MODEL=qwen3.7-plus
+QWEN_TIMEOUT_MS=12000
+REPORT_QWEN_TIMEOUT_MS=8000
 ```
 
 Use SAE secret/environment management for `QWEN_API_KEY`. Never bake it into

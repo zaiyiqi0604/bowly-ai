@@ -71,14 +71,24 @@ export function createMockParentReport(
     (moment) =>
       moment.category === "framing" && (moment.confidence ?? 0) >= 0.8
   );
+  const postureMoment = session.reviewMoments?.find(
+    (moment) =>
+      moment.category === "posture" && (moment.confidence ?? 0) >= 0.8
+  );
+  const soundSummary =
+    activity?.pitchDataQuality === "good"
+      ? ` About ${activity.inTunePercent}% of clear pitch frames were near the closest standard note.`
+      : "";
   return {
     summary: `${session.childName} practised for ${Math.max(
       1,
       Math.round(session.durationSeconds / 60)
-    )} minutes today. ${activitySummary}`,
-    postureInsight: framingMoment
-      ? `The camera view needed adjustment for ${framingMoment.totalDurationSeconds} seconds.`
-      : "The camera did not record a persistent visibility problem.",
+    )} minutes today. ${activitySummary}${soundSummary}`,
+    postureInsight: postureMoment
+      ? `${postureMoment.title} appeared for about ${postureMoment.totalDurationSeconds} seconds. Next time: ${postureMoment.suggestion}`
+      : framingMoment
+        ? `This was a camera-view issue, not a playing issue: ${framingMoment.suggestion}`
+        : "No repeated playing-position issue stood out today.",
     motivationLevel: "medium",
     tomorrowSuggestion: session.practiceMode === "assignment"
       ? "Continue the same assigned section with one calm repeat."
