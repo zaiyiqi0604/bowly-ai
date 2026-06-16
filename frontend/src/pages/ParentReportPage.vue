@@ -8,6 +8,7 @@ import {
   CheckCircleIcon,
   ClockIcon,
   EyeIcon,
+  LightBulbIcon,
   MusicalNoteIcon,
   PlayCircleIcon,
   StarIcon,
@@ -327,6 +328,9 @@ const aiWritingBody = computed(() => {
   }
   return "Demo mode uses the same report shape with stable sample data.";
 });
+const aiPipelineStepTitle = computed(() =>
+  aiReportState.value === "ready" ? "Parent summary ready" : "Parent summary writing",
+);
 const aiWritingBadge = computed(() => {
   if (aiReportState.value === "ready") return "AI refined";
   if (aiReportState.value === "fallback") return "local fallback";
@@ -628,7 +632,7 @@ onMounted(async () => {
                   2
                 </span>
                 <div>
-                  <p class="font-semibold">Parent summary writing</p>
+                <p class="font-semibold">{{ aiPipelineStepTitle }}</p>
                   <p class="mt-1 text-sm leading-6 opacity-75">
                     {{ aiWritingBody }}
                   </p>
@@ -703,6 +707,22 @@ onMounted(async () => {
               {{ qwenProofText }}
             </p>
             <div class="mt-6 space-y-3">
+              <div class="rounded-2xl bg-stage-900 p-5 text-white shadow-sm">
+                <div class="flex items-start justify-between gap-3">
+                  <div>
+                    <LightBulbIcon class="h-6 w-6 text-orange-300" />
+                    <p class="mt-4 text-xs font-semibold uppercase tracking-[0.14em] text-orange-300">
+                      Tomorrow's suggestion
+                    </p>
+                  </div>
+                  <span class="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-orange-200 ring-1 ring-white/10">
+                    {{ aiWritingBadge }}
+                  </span>
+                </div>
+                <p class="mt-4 text-xl font-semibold leading-8">
+                  {{ report?.tomorrowSuggestion ?? fallbackSuggestion }}
+                </p>
+              </div>
               <div class="rounded-2xl border border-stone-200 bg-white p-4">
                 <div class="flex items-center justify-between gap-3">
                   <p class="font-semibold text-stage-950">What went well today</p>
@@ -710,15 +730,6 @@ onMounted(async () => {
                 </div>
                 <p class="mt-3 text-sm leading-6 text-stone-600">
                   {{ report?.summary ?? latestSession.coachHighlights.join(" ") }}
-                </p>
-              </div>
-              <div class="rounded-2xl border border-stone-200 bg-white p-4">
-                <div class="flex items-center justify-between gap-3">
-                  <p class="font-semibold text-stage-950">Tomorrow's suggestion</p>
-                  <span class="text-xs font-semibold text-orange-600">{{ aiWritingBadge }}</span>
-                </div>
-                <p class="mt-3 text-sm leading-6 text-stone-600">
-                  {{ report?.tomorrowSuggestion ?? fallbackSuggestion }}
                 </p>
               </div>
               <div class="rounded-2xl border border-stone-200 bg-white p-4">
