@@ -61,6 +61,7 @@ export interface AiResponseMeta {
   model: string;
   fallbackUsed: boolean;
   lastError?: string;
+  durationMs?: number;
 }
 
 export interface AiCallStatus {

@@ -117,14 +117,17 @@ function recordFallback(error: unknown, operation: AiOperation, durationMs?: num
 function createResponseMeta(
   provider: AiProvider,
   fallbackUsed: boolean,
-  lastError?: string
+  lastError?: string,
+  model = process.env.QWEN_MODEL ?? "qwen-plus",
+  durationMs?: number
 ): AiResponseMeta {
   return {
     mode: shouldUseMockMode() ? "mock" : "live",
     provider,
-    model: process.env.QWEN_MODEL ?? "qwen-plus",
+    model,
     fallbackUsed,
     lastError,
+    durationMs,
   };
 }
 
@@ -132,11 +135,13 @@ function withAiMeta<T>(
   response: T,
   provider: AiProvider,
   fallbackUsed = false,
-  lastError?: string
+  lastError?: string,
+  model?: string,
+  durationMs?: number
 ): WithAiMeta<T> {
   return {
     ...response,
-    ai: createResponseMeta(provider, fallbackUsed, lastError),
+    ai: createResponseMeta(provider, fallbackUsed, lastError, model, durationMs),
   };
 }
 
@@ -148,6 +153,10 @@ function timeoutAfter<T>(milliseconds: number, message: string): Promise<T> {
 
 function getReportQwenTimeoutMs() {
   return Number(process.env.REPORT_QWEN_TIMEOUT_MS ?? 25000);
+}
+
+function getReportModel() {
+  return process.env.QWEN_REPORT_MODEL ?? "qwen3.6-flash";
 }
 
 export async function generateCoachFeedback(
@@ -185,12 +194,21 @@ export async function generateParentReport(
         "Qwen report timed out before the report response deadline."
       ),
     ]);
-    recordSuccess("qwen", "report", Date.now() - startedAt);
-    return withAiMeta(response, "qwen");
+    const durationMs = Date.now() - startedAt;
+    recordSuccess("qwen", "report", durationMs);
+    return withAiMeta(response, "qwen", false, undefined, getReportModel(), durationMs);
   } catch (error) {
     console.error("Qwen report failed, falling back to mock.", error);
-    const lastError = recordFallback(error, "report", Date.now() - startedAt);
-    return withAiMeta(createMockParentReport(payload), "mock-fallback", true, lastError);
+    const durationMs = Date.now() - startedAt;
+    const lastError = recordFallback(error, "report", durationMs);
+    return withAiMeta(
+      createMockParentReport(payload),
+      "mock-fallback",
+      true,
+      lastError,
+      getReportModel(),
+      durationMs
+    );
   }
 }
 

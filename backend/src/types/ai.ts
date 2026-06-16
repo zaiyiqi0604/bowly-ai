@@ -49,6 +49,7 @@ export interface AiResponseMeta {
   model: string;
   fallbackUsed: boolean;
   lastError?: string;
+  durationMs?: number;
 }
 
 export type WithAiMeta<T> = T & {

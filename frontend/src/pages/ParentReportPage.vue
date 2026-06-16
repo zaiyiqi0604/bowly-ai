@@ -277,28 +277,70 @@ const fallbackSuggestion = computed(() =>
     ? "Continue the same assigned section with one calm repeat."
     : "Choose one small intention before the next free practice."
 );
-const aiStatusLabel = computed(() => {
-  if (!aiStatus.value) return "AI status unavailable";
-  if (aiStatus.value.provider === "qwen") return `AI summary ready - ${aiStatus.value.model}`;
-  if (aiStatus.value.provider === "mock-fallback") return "Local summary active";
-  if (aiStatus.value.mode === "live") {
-    return aiStatus.value.keyConfigured
-      ? `AI connection pending - ${aiStatus.value.model}`
-      : "AI connection needs setup";
-  }
-  return aiStatus.value.keyConfigured
-    ? "Demo summary active"
-    : "Demo summary active";
+const reportCall = computed(() => aiStatus.value?.calls?.report);
+const reportModelLabel = computed(
+  () => report.value?.ai?.model ?? aiStatus.value?.reportModel ?? aiStatus.value?.model ?? "report AI",
+);
+const reportDurationMs = computed(() => report.value?.ai?.durationMs ?? reportCall.value?.durationMs);
+function formatDurationMs(value?: number) {
+  if (!value) return "";
+  if (value < 1000) return `${value}ms`;
+  return `${(value / 1000).toFixed(value >= 10000 ? 1 : 0)}s`;
+}
+const reportDurationLabel = computed(() => formatDurationMs(reportDurationMs.value));
+const aiReportState = computed<"pending" | "generating" | "ready" | "fallback" | "demo">(() => {
+  if (loading.value) return "generating";
+  if (report.value?.ai?.provider === "qwen") return "ready";
+  if (report.value?.ai?.provider === "mock-fallback") return "fallback";
+  if (report.value?.ai?.provider === "mock") return "demo";
+  if (aiStatus.value?.mode === "live" && aiStatus.value.keyConfigured) return "pending";
+  return "demo";
 });
-const aiStatusTone = computed(() => {
-  if (aiStatus.value?.provider === "qwen") return "bg-lime-50 text-lime-800 ring-lime-200";
-  if (
-    aiStatus.value?.provider === "mock-fallback" ||
-    (aiStatus.value?.mode === "live" && !aiStatus.value.keyConfigured)
-  ) {
-    return "bg-orange-50 text-orange-800 ring-orange-200";
+const aiReportStateLabel = computed(() => {
+  if (aiReportState.value === "ready") return "AI parent summary ready";
+  if (aiReportState.value === "generating") return "AI parent summary generating";
+  if (aiReportState.value === "fallback") return "Local summary active";
+  if (aiReportState.value === "pending") return "AI parent summary pending";
+  return "Demo summary active";
+});
+const aiReportStateTone = computed(() => {
+  if (aiReportState.value === "ready") return "bg-lime-50 text-lime-800 ring-lime-200";
+  if (aiReportState.value === "fallback") return "bg-orange-50 text-orange-800 ring-orange-200";
+  if (aiReportState.value === "generating" || aiReportState.value === "pending") {
+    return "bg-bowly-50 text-bowly-800 ring-bowly-200";
   }
   return "bg-stone-100 text-stone-600 ring-stone-200";
+});
+const aiWritingBody = computed(() => {
+  if (aiReportState.value === "ready") {
+    return `Report updated by ${reportModelLabel.value}${reportDurationLabel.value ? ` in ${reportDurationLabel.value}` : ""}.`;
+  }
+  if (aiReportState.value === "fallback") {
+    return "Cloud AI did not finish, so Bowly kept the local summary available.";
+  }
+  if (aiReportState.value === "generating") {
+    return "Local report is visible now. AI wording will update the highlighted sections automatically.";
+  }
+  if (aiReportState.value === "pending") {
+    return "Bowly will request an AI parent summary after the latest session loads.";
+  }
+  return "Demo mode uses the same report shape with stable sample data.";
+});
+const aiWritingBadge = computed(() => {
+  if (aiReportState.value === "ready") return "AI refined";
+  if (aiReportState.value === "fallback") return "local fallback";
+  if (aiReportState.value === "generating") return "AI writing";
+  return "local draft";
+});
+const aiWritingBadgeTone = computed(() => {
+  if (aiReportState.value === "ready") return "bg-bowly-50 text-bowly-700 ring-bowly-200";
+  if (aiReportState.value === "fallback") return "bg-orange-50 text-orange-800 ring-orange-200";
+  return "bg-white text-bowly-700 ring-bowly-200";
+});
+const pipelineStepTwoClass = computed(() => {
+  if (aiReportState.value === "ready") return "border-lime-200 bg-lime-50 text-lime-900";
+  if (aiReportState.value === "fallback") return "border-orange-200 bg-orange-50 text-orange-900";
+  return "border-bowly-200 bg-bowly-50 text-bowly-900";
 });
 const qwenProofText = computed(() => {
   const responseAi = report.value?.ai;
@@ -322,19 +364,12 @@ const qwenProofText = computed(() => {
     return "Health check shows the fallback path is active, keeping the demo reliable under timeout.";
   }
   if (aiStatus.value?.mode === "live" && aiStatus.value.keyConfigured) {
-    return `${aiStatus.value.model} is configured; Bowly keeps the report usable if the cloud call is slow.`;
+    return `${reportModelLabel.value} is configured; Bowly keeps the report usable if the cloud call is slow.`;
   }
   if (aiStatus.value?.mode === "live" && !aiStatus.value.keyConfigured) {
     return "The report contract remains usable while cloud AI credentials are being set up.";
   }
   return "The demo keeps a stable report contract for judges to review.";
-});
-const familyProofText = computed(() => {
-  const suggestion = report.value?.tomorrowSuggestion ?? fallbackSuggestion.value;
-  if (report.value?.summary) {
-    return `Structured signals become a parent summary plus one next step: ${suggestion}`;
-  }
-  return `Even without a cloud report response, Bowly still gives one safe next step: ${suggestion}`;
 });
 const reportMetricStats = computed(() => [
   {
@@ -363,20 +398,6 @@ const reportMetricStats = computed(() => [
         : "Not enough clear pitch data",
     tone: "bg-orange-50 text-orange-800",
     icon: MusicalNoteIcon,
-  },
-]);
-const aiProofSteps = computed(() => [
-  {
-    label: "Local signals",
-    detail: "camera, pitch, pauses",
-  },
-  {
-    label: report.value?.ai?.provider === "qwen" ? "Live Qwen" : "Qwen / fallback",
-    detail: report.value?.ai?.provider === "qwen" ? "cloud response used" : "same report shape",
-  },
-  {
-    label: "Parent note",
-    detail: "summary plus next step",
   },
 ]);
 const aiStatusTooltip = computed(() => {
@@ -574,14 +595,23 @@ onMounted(async () => {
           </p>
         </div>
         <div class="flex flex-col items-start gap-3 sm:items-end">
-          <span
-            class="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold ring-1 ring-inset"
-            :class="aiStatusTone"
-            :title="aiStatusTooltip"
-          >
-            <span class="h-2 w-2 rounded-full bg-current opacity-70"></span>
-            {{ aiStatusLabel }}
-          </span>
+          <div class="flex flex-wrap justify-start gap-2 sm:justify-end">
+            <span class="inline-flex items-center gap-2 rounded-full bg-lime-50 px-3 py-1.5 text-xs font-semibold text-lime-800 ring-1 ring-inset ring-lime-200">
+              <CheckCircleIcon class="h-4 w-4" />
+              Local facts ready
+            </span>
+            <span
+              class="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold ring-1 ring-inset"
+              :class="aiReportStateTone"
+              :title="aiStatusTooltip"
+            >
+              <span
+                class="h-2 w-2 rounded-full bg-current opacity-70"
+                :class="loading ? 'animate-pulse' : ''"
+              ></span>
+              {{ aiReportStateLabel }}
+            </span>
+          </div>
           <RouterLink to="/practice" class="primary-button">Start a new session</RouterLink>
         </div>
       </div>
@@ -591,99 +621,219 @@ onMounted(async () => {
         <p class="mt-2 text-sm text-stone-500">Complete a practice session to create the first report.</p>
       </div>
 
-      <section v-else class="mt-8">
-        <div class="grid gap-5 lg:grid-cols-3">
-          <article class="rounded-3xl bg-stage-950 p-6 text-white shadow-sm sm:p-7">
-            <CameraIcon class="h-7 w-7 text-bowly-200" />
-            <p class="mt-6 text-xs font-semibold uppercase tracking-[0.18em] text-bowly-200">
-              Local perception
-            </p>
-            <p class="mt-3 text-5xl font-semibold leading-none">
-              {{ activity?.phraseCount ?? 0 }}
-            </p>
-            <p class="mt-2 text-lg font-semibold leading-7">sections captured on device</p>
-            <div class="mt-6 grid gap-2 text-sm leading-6 text-white/65">
-              <span>Longest phrase {{ Math.round(activity?.longestContinuousSeconds ?? 0) }} sec</span>
-              <span>{{ reviewMoments.length }} private movement {{ reviewMoments.length === 1 ? "moment" : "moments" }}</span>
-              <span>{{ activity?.pitchDataQuality ?? "insufficient" }} pitch data</span>
-            </div>
-          </article>
-
-          <article class="rounded-3xl border border-orange-100 bg-orange-50 p-6 text-orange-950 shadow-sm">
-            <div class="flex flex-col justify-between gap-4 md:flex-row md:items-start">
+      <section v-else class="mt-8 space-y-5">
+        <article class="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm sm:p-6">
+          <div class="grid gap-4 lg:grid-cols-[1fr_1.2fr_1fr_auto] lg:items-center">
+            <div class="flex items-start gap-4">
+              <span class="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-lime-100 text-lime-700">
+                <CheckCircleIcon class="h-7 w-7" />
+              </span>
               <div>
-                <LightBulbIcon class="h-7 w-7 text-orange-600" />
-                <p class="mt-6 text-xs font-semibold uppercase tracking-[0.18em] text-orange-700">
-                  AI report path
-                </p>
-                <h3 class="mt-3 text-2xl font-semibold leading-8 text-stage-950">
-                  Local signals become a stable parent note.
-                </h3>
-                <p class="mt-3 text-sm leading-6 text-orange-900/70">
-                  {{ qwenProofText }}
+                <p class="text-sm font-semibold text-lime-800">1. Edge perception complete</p>
+                <p class="mt-1 text-sm leading-6 text-stone-500">
+                  {{ activity?.phraseCount ?? 0 }} sections captured on device<br />
+                  Longest phrase {{ Math.round(activity?.longestContinuousSeconds ?? 0) }} sec
                 </p>
               </div>
             </div>
-            <div class="mt-5 grid gap-2">
-              <div
-                v-for="step in aiProofSteps"
-                :key="step.label"
-                class="rounded-2xl bg-white/70 p-3"
+            <div
+              class="rounded-2xl border p-5"
+              :class="pipelineStepTwoClass"
+            >
+              <div class="flex items-start gap-4">
+                <span class="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-white text-lg font-semibold ring-1 ring-inset ring-current/20">
+                  2
+                </span>
+                <div>
+                  <p class="font-semibold">Parent summary writing</p>
+                  <p class="mt-1 text-sm leading-6 opacity-75">
+                    {{ aiWritingBody }}
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div class="flex items-start gap-4">
+              <span
+                class="grid h-11 w-11 shrink-0 place-items-center rounded-full border text-lg font-semibold"
+                :class="aiReportState === 'ready' ? 'border-lime-300 bg-lime-50 text-lime-700' : 'border-stone-300 bg-white text-stone-500'"
               >
-                <p class="text-sm font-semibold text-stage-950">{{ step.label }}</p>
-                <p class="mt-1 text-xs leading-5 text-stone-500">{{ step.detail }}</p>
+                3
+              </span>
+              <div>
+                <p class="text-sm font-semibold text-stage-950">Report ready</p>
+                <p class="mt-1 text-sm leading-6 text-stone-500">
+                  AI summary updates highlighted sections automatically.
+                </p>
               </div>
             </div>
-          </article>
+            <div class="flex flex-col gap-2 lg:items-end">
+              <span class="inline-flex items-center gap-2 rounded-full bg-white px-3 py-2 text-xs font-semibold text-stone-700 ring-1 ring-stone-200">
+                <ClockIcon class="h-4 w-4" />
+                {{ reportDurationLabel || "about 15-25 sec" }}
+              </span>
+              <span class="inline-flex items-center gap-2 rounded-full bg-white px-3 py-2 text-xs font-semibold text-stone-700 ring-1 ring-stone-200">
+                Report AI: {{ reportModelLabel }}
+              </span>
+            </div>
+          </div>
+          <p class="mt-4 text-sm leading-6 text-stone-500">
+            Local facts show first so the report is useful immediately. AI wording updates the parent-facing summary when it is ready.
+          </p>
+        </article>
 
-          <article class="rounded-3xl border border-lime-200 bg-lime-50 p-6 text-lime-950 shadow-sm">
-            <EyeIcon class="h-7 w-7 text-lime-700" />
-            <p class="mt-6 text-xs font-semibold uppercase tracking-[0.18em] text-lime-700">
-              Privacy promise
-            </p>
-            <h3 class="mt-3 text-3xl font-semibold leading-9 text-stage-950">
-              No raw video or audio stored.
-            </h3>
-            <p class="mt-4 text-sm leading-6 text-lime-900/75">
-              Bowly keeps only structured practice signals and anonymous body points for the parent report.
-            </p>
-            <span class="mt-6 inline-flex items-center gap-2 rounded-full bg-white/70 px-3 py-1.5 text-xs font-semibold text-lime-800 ring-1 ring-lime-200">
-              <CheckCircleIcon class="h-4 w-4" />
-              private by design
-            </span>
-          </article>
-        </div>
+        <div class="grid gap-5 lg:grid-cols-[0.9fr_1.35fr_0.95fr]">
+          <div class="space-y-5">
+            <article class="rounded-3xl border border-bowly-100 bg-bowly-50 p-6 text-bowly-950 shadow-sm">
+              <div class="flex items-center justify-between gap-3">
+                <CameraIcon class="h-8 w-8 text-bowly-600" />
+                <span class="rounded-full bg-white px-3 py-1 text-xs font-semibold text-bowly-700 ring-1 ring-bowly-200">
+                  instant local fact
+                </span>
+              </div>
+              <p class="mt-6 text-xs font-semibold uppercase tracking-[0.18em] text-bowly-600">
+                Local perception
+              </p>
+              <p class="mt-3 text-5xl font-semibold leading-none">{{ activity?.phraseCount ?? 0 }}</p>
+              <p class="mt-2 font-semibold leading-7 text-stage-950">sections captured on device</p>
+              <div class="mt-6 space-y-3 border-t border-bowly-200/70 pt-5 text-sm leading-6 text-bowly-900/75">
+                <p>Longest phrase <strong>{{ Math.round(activity?.longestContinuousSeconds ?? 0) }} sec</strong></p>
+                <p>{{ reviewMoments.length }} private movement {{ reviewMoments.length === 1 ? "moment" : "moments" }}</p>
+                <p>{{ activity?.pitchDataQuality ?? "insufficient" }} pitch data</p>
+              </div>
+            </article>
 
-        <div class="mt-5 grid gap-5 lg:grid-cols-[1.4fr_1fr]">
+            <article class="rounded-3xl border border-lime-200 bg-lime-50 p-6 text-lime-950 shadow-sm">
+              <div class="flex items-center justify-between gap-3">
+                <EyeIcon class="h-7 w-7 text-lime-700" />
+                <span class="rounded-full bg-white px-3 py-1 text-xs font-semibold text-lime-800 ring-1 ring-lime-200">
+                  instant local fact
+                </span>
+              </div>
+              <p class="mt-5 text-xs font-semibold uppercase tracking-[0.18em] text-lime-700">
+                Privacy proof
+              </p>
+              <h3 class="mt-3 text-xl font-semibold leading-7 text-stage-950">
+                No raw video or audio stored.
+              </h3>
+              <p class="mt-3 text-sm leading-6 text-lime-900/75">
+                Only structured practice signals and anonymous body points are used.
+              </p>
+              <span class="mt-5 inline-flex items-center gap-2 rounded-full bg-white/70 px-3 py-1.5 text-xs font-semibold text-lime-800 ring-1 ring-lime-200">
+                <CheckCircleIcon class="h-4 w-4" />
+                private by design
+              </span>
+            </article>
+          </div>
+
           <article class="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm sm:p-6">
-            <p class="section-kicker">Today's practice report</p>
-            <div class="mt-4 grid gap-3 sm:grid-cols-3">
-              <article
-                v-for="stat in reportMetricStats"
-                :key="stat.label"
-                class="rounded-2xl p-4 ring-1 ring-inset ring-black/5"
-                :class="stat.tone"
+            <div class="flex items-center justify-between gap-3">
+              <div>
+                <p class="section-kicker">AI summary</p>
+                <h2 class="mt-2 text-2xl font-semibold text-stage-950">
+                  {{ aiReportState === "ready" ? "Parent summary ready" : "Parent summary in progress" }}
+                </h2>
+              </div>
+              <span
+                class="rounded-full px-3 py-1 text-xs font-semibold ring-1 ring-inset"
+                :class="aiWritingBadgeTone"
               >
-                <component :is="stat.icon" class="h-5 w-5" />
-                <p class="mt-3 text-xs font-semibold uppercase tracking-[0.12em] opacity-65">
-                  {{ stat.label }}
-                </p>
-                <p class="mt-1 text-2xl font-semibold">{{ stat.value }}</p>
-                <p class="mt-1 text-xs leading-5 opacity-70">{{ stat.detail }}</p>
-              </article>
+                {{ aiWritingBadge }}
+              </span>
             </div>
+            <p class="mt-3 text-sm leading-6 text-stone-500">
+              {{ qwenProofText }}
+            </p>
+            <div class="mt-6 space-y-3">
+              <div class="rounded-2xl border border-stone-200 bg-white p-4">
+                <div class="flex items-center justify-between gap-3">
+                  <p class="font-semibold text-stage-950">What went well today</p>
+                  <span class="text-xs font-semibold text-bowly-600">{{ aiWritingBadge }}</span>
+                </div>
+                <p class="mt-3 text-sm leading-6 text-stone-600">
+                  {{ report?.summary ?? latestSession.coachHighlights.join(" ") }}
+                </p>
+              </div>
+              <div class="rounded-2xl border border-stone-200 bg-white p-4">
+                <div class="flex items-center justify-between gap-3">
+                  <p class="font-semibold text-stage-950">Tomorrow's suggestion</p>
+                  <span class="text-xs font-semibold text-orange-600">{{ aiWritingBadge }}</span>
+                </div>
+                <p class="mt-3 text-sm leading-6 text-stone-600">
+                  {{ report?.tomorrowSuggestion ?? fallbackSuggestion }}
+                </p>
+              </div>
+              <div class="rounded-2xl border border-stone-200 bg-white p-4">
+                <div class="flex items-center justify-between gap-3">
+                  <p class="font-semibold text-stage-950">Memory note for next step</p>
+                  <span class="text-xs font-semibold text-lime-700">{{ aiWritingBadge }}</span>
+                </div>
+                <p class="mt-3 text-sm leading-6 text-stone-600">
+                  {{ report?.memoryInsight ?? continuityInsight }}
+                </p>
+              </div>
+            </div>
+            <p class="mt-5 rounded-2xl bg-bowly-50 px-4 py-3 text-sm leading-6 text-bowly-800">
+              These sections are refined by AI. If the cloud call is slow, the local version stays visible.
+            </p>
           </article>
 
-          <article class="rounded-3xl bg-lime-50 p-6 text-lime-950 shadow-sm ring-1 ring-inset ring-lime-200">
-            <CheckCircleIcon class="h-7 w-7 text-lime-700" />
-            <p class="mt-5 text-xs font-semibold uppercase tracking-[0.14em] text-lime-700">
-              Family-safe output
+          <article class="rounded-3xl border border-blue-100 bg-blue-50 p-6 text-blue-950 shadow-sm">
+            <CheckCircleIcon class="h-8 w-8 text-blue-600" />
+            <h3 class="mt-6 text-2xl font-semibold leading-8 text-stage-950">
+              If AI is slow, Bowly keeps the local summary.
+            </h3>
+            <p class="mt-4 text-sm leading-6 text-blue-900/75">
+              You will always see a helpful report based on the child&apos;s practice.
             </p>
-            <p class="mt-3 text-lg font-semibold leading-7">
-              {{ familyProofText }}
-            </p>
+            <div class="mt-6 space-y-3 text-sm font-medium text-blue-900">
+              <p class="flex items-center gap-2">
+                <CheckCircleIcon class="h-5 w-5 text-blue-500" />
+                Local facts are always available
+              </p>
+              <p class="flex items-center gap-2">
+                <CheckCircleIcon class="h-5 w-5 text-blue-500" />
+                AI wording improves the parent note
+              </p>
+              <p class="flex items-center gap-2">
+                <CheckCircleIcon class="h-5 w-5 text-blue-500" />
+                Nothing is lost if AI is slow
+              </p>
+            </div>
           </article>
         </div>
+
+        <article class="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm sm:p-6">
+          <p class="section-kicker">Today's practice report</p>
+          <div class="mt-4 grid gap-3 lg:grid-cols-[1fr_1fr_1fr_1.25fr]">
+            <article
+              v-for="stat in reportMetricStats"
+              :key="stat.label"
+              class="rounded-2xl p-4 ring-1 ring-inset ring-black/5"
+              :class="stat.tone"
+            >
+              <div class="flex items-start justify-between gap-3">
+                <component :is="stat.icon" class="h-5 w-5" />
+                <span class="rounded-full bg-white/70 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] opacity-70">
+                  local
+                </span>
+              </div>
+              <p class="mt-3 text-xs font-semibold uppercase tracking-[0.12em] opacity-65">
+                {{ stat.label }}
+              </p>
+              <p class="mt-1 text-2xl font-semibold">{{ stat.value }}</p>
+              <p class="mt-1 text-xs leading-5 opacity-70">{{ stat.detail }}</p>
+            </article>
+            <article class="rounded-2xl bg-stage-900 p-5 text-white shadow-sm">
+              <LightBulbIcon class="h-6 w-6 text-orange-300" />
+              <p class="mt-4 text-xs font-semibold uppercase tracking-[0.14em] text-orange-300">
+                Tomorrow's suggestion
+              </p>
+              <p class="mt-3 text-lg font-semibold leading-7">
+                {{ report?.tomorrowSuggestion ?? fallbackSuggestion }}
+              </p>
+            </article>
+          </div>
+        </article>
       </section>
 
       <div v-if="latestSession" class="mt-5 grid gap-5 md:grid-cols-3">
