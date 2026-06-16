@@ -10,7 +10,7 @@ import type { PracticeSessionRecord } from "../types/session";
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ??
   (import.meta.env.PROD ? "https://api.bowly.io" : "http://localhost:8787");
-const DEFAULT_TIMEOUT_MS = 12000;
+const DEFAULT_TIMEOUT_MS = 45000;
 
 async function fetchWithTimeout(
   input: RequestInfo | URL,
