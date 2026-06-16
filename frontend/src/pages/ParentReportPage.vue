@@ -407,24 +407,6 @@ const aiStatusTooltip = computed(() => {
   }
   return "Bowly can show a local parent summary even when cloud AI is still connecting.";
 });
-const sessionDetailCards = computed(() => {
-  const cards: string[] = [];
-  if (report.value?.postureInsight) {
-    cards.push(report.value.postureInsight);
-  } else if (postureMoments.value.length) {
-    cards.push(`Bowly noticed ${postureMoments.value[0]?.title.toLowerCase()} and suggests: ${focusText.value}`);
-  } else {
-    cards.push("No repeated playing-position issue stood out today.");
-  }
-
-  if (report.value?.memoryInsight) {
-    cards.push(report.value.memoryInsight);
-  } else {
-    cards.push(continuityInsight.value);
-  }
-  return cards;
-});
-
 onMounted(async () => {
   try {
     aiStatus.value = (await fetchBackendHealth()).ai;
@@ -447,7 +429,7 @@ onMounted(async () => {
 
 <template>
   <section class="min-h-[calc(100vh-4.5rem)] px-4 py-10 sm:px-6 lg:px-8">
-    <div class="mx-auto max-w-6xl">
+    <div class="mx-auto max-w-7xl">
       <div v-if="latestSession && !showParentReport" class="mx-auto max-w-md md:hidden">
         <div class="flex items-center justify-between">
           <RouterLink to="/practice" class="grid h-10 w-10 place-items-center rounded-full bg-stone-100 text-stage-900">
@@ -837,29 +819,6 @@ onMounted(async () => {
       </section>
 
       <div v-if="latestSession" class="mt-5 grid gap-5 md:grid-cols-3">
-        <article class="light-card md:col-span-2">
-          <p class="section-kicker">What went well today</p>
-          <p class="mt-4 text-xl leading-8 text-stage-900">
-            {{ report?.summary ?? latestSession.coachHighlights.join(" ") }}
-          </p>
-          <div class="mt-7 grid gap-4 sm:grid-cols-2">
-            <div
-              v-for="detail in sessionDetailCards"
-              :key="detail"
-              class="rounded-xl bg-stone-50 p-4 text-sm leading-6 text-stone-600"
-            >
-              {{ detail }}
-            </div>
-          </div>
-        </article>
-        <article class="rounded-2xl bg-stage-900 p-6 text-white shadow-sm">
-          <LightBulbIcon class="h-7 w-7 text-orange-300" />
-          <p class="mt-5 text-sm text-white/45">Tomorrow's suggestion</p>
-          <p class="mt-3 text-lg leading-7">
-            {{ report?.tomorrowSuggestion ?? fallbackSuggestion }}
-          </p>
-        </article>
-
         <section class="light-card md:col-span-3">
           <div class="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
             <div>
