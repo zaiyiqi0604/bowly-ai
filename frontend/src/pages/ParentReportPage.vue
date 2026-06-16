@@ -332,35 +332,35 @@ const familyProofText = computed(() => {
   }
   return `Even without a cloud report response, Bowly still gives one safe next step: ${suggestion}`;
 });
-const proofStats = computed(() => {
-  const phraseCount = activity.value?.phraseCount ?? 0;
-  const longest = Math.round(activity.value?.longestContinuousSeconds ?? 0);
-  const reviewCount = reviewMoments.value.length;
-  const pitchQuality = activity.value?.pitchDataQuality ?? "insufficient";
-  return [
-    {
-      label: "Sections",
-      value: `${phraseCount}`,
-      detail: "local playing segments",
-      tone: "bg-bowly-50 text-bowly-800",
-      icon: PlayCircleIcon,
-    },
-    {
-      label: "Longest phrase",
-      value: longest > 0 ? `${longest}s` : "--",
-      detail: "continuous playing",
-      tone: "bg-lime-50 text-lime-800",
-      icon: ClockIcon,
-    },
-    {
-      label: "Private moments",
-      value: `${reviewCount}`,
-      detail: `${pitchQuality} pitch data`,
-      tone: "bg-orange-50 text-orange-800",
-      icon: EyeIcon,
-    },
-  ];
-});
+const reportMetricStats = computed(() => [
+  {
+    label: "Practice duration",
+    value:
+      (latestSession.value?.durationSeconds ?? 0) < 60
+        ? "<1 min"
+        : `${Math.round((latestSession.value?.durationSeconds ?? 0) / 60)} min`,
+    detail: "short focused session",
+    tone: "bg-bowly-50 text-bowly-800",
+    icon: ClockIcon,
+  },
+  {
+    label: "Playing sections",
+    value: `${activity.value?.phraseCount ?? "--"}`,
+    detail: `Longest ${Math.round(activity.value?.longestContinuousSeconds ?? 0)} sec`,
+    tone: "bg-lime-50 text-lime-800",
+    icon: PlayCircleIcon,
+  },
+  {
+    label: "Near note",
+    value: (activity.value?.pitchedSeconds ?? 0) >= 12 ? `${activity.value?.inTunePercent}%` : "--",
+    detail:
+      (activity.value?.pitchedSeconds ?? 0) >= 12
+        ? "Uses a comfortable +/-20 cent range"
+        : "Not enough clear pitch data",
+    tone: "bg-orange-50 text-orange-800",
+    icon: MusicalNoteIcon,
+  },
+]);
 const aiProofSteps = computed(() => [
   {
     label: "Local signals",
@@ -551,12 +551,22 @@ onMounted(async () => {
         <ArrowLeftIcon class="h-4 w-4" />
         Back to child recap
       </button>
-      <p class="section-kicker">Progress overview</p>
+      <p class="section-kicker">{{ latestSession ? "Hackathon demo proof" : "Progress overview" }}</p>
       <div class="mt-3 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
-          <h1 class="text-4xl font-semibold tracking-tight text-stage-950">Today's Practice Report</h1>
+          <h1 class="text-4xl font-semibold tracking-tight text-stage-950">
+            {{
+              latestSession
+                ? "Private practice signals become an AI-ready parent report."
+                : "Today's Practice Report"
+            }}
+          </h1>
           <p class="mt-3 max-w-2xl text-stone-500">
-            A simple summary of today's practice, what went well, and one calm next step.
+            {{
+              latestSession
+                ? "Edge perception stays on device, Qwen or local fallback writes the family summary, and raw video/audio is not stored."
+                : "A simple summary of today's practice, what went well, and one calm next step."
+            }}
           </p>
         </div>
         <div class="flex flex-col items-start gap-3 sm:items-end">
@@ -578,73 +588,85 @@ onMounted(async () => {
       </div>
 
       <section v-else class="mt-8">
-        <div class="grid gap-5 lg:grid-cols-[1.05fr_1.95fr]">
+        <div class="grid gap-5 lg:grid-cols-3">
           <article class="rounded-3xl bg-stage-950 p-6 text-white shadow-sm sm:p-7">
-            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-bowly-200">
-              Hackathon demo proof
+            <CameraIcon class="h-7 w-7 text-bowly-200" />
+            <p class="mt-6 text-xs font-semibold uppercase tracking-[0.18em] text-bowly-200">
+              Local perception
             </p>
-            <h2 class="mt-4 text-3xl font-semibold leading-tight">
-              Private practice signals become an AI-ready parent report.
-            </h2>
-            <p class="mt-4 text-sm leading-7 text-white/65">
-              Edge perception stays on device, Qwen or a local fallback writes the family summary,
-              and raw video/audio is not stored.
+            <p class="mt-3 text-5xl font-semibold leading-none">
+              {{ activity?.phraseCount ?? 0 }}
             </p>
-            <div class="mt-6 flex flex-wrap gap-2">
-              <span class="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white ring-1 ring-white/15">
-                <span class="h-2 w-2 rounded-full bg-lime-300"></span>
-                {{ aiStatusLabel }}
-              </span>
-              <span class="inline-flex items-center gap-2 rounded-full bg-lime-300/15 px-3 py-1.5 text-xs font-semibold text-lime-100 ring-1 ring-lime-200/25">
-                <EyeIcon class="h-4 w-4" />
-                No raw media stored
-              </span>
+            <p class="mt-2 text-lg font-semibold leading-7">sections captured on device</p>
+            <div class="mt-6 grid gap-2 text-sm leading-6 text-white/65">
+              <span>Longest phrase {{ Math.round(activity?.longestContinuousSeconds ?? 0) }} sec</span>
+              <span>{{ reviewMoments.length }} private movement {{ reviewMoments.length === 1 ? "moment" : "moments" }}</span>
+              <span>{{ activity?.pitchDataQuality ?? "insufficient" }} pitch data</span>
             </div>
           </article>
 
-          <div class="grid gap-4 md:grid-cols-3">
-            <article
-              v-for="stat in proofStats"
-              :key="stat.label"
-              class="rounded-3xl p-5 shadow-sm ring-1 ring-inset ring-black/5"
-              :class="stat.tone"
-            >
-              <component :is="stat.icon" class="h-7 w-7" />
-              <p class="mt-5 text-xs font-semibold uppercase tracking-[0.14em] opacity-65">
-                {{ stat.label }}
-              </p>
-              <p class="mt-2 text-4xl font-semibold leading-none">{{ stat.value }}</p>
-              <p class="mt-2 text-sm leading-6 opacity-75">{{ stat.detail }}</p>
-            </article>
-          </div>
+          <article class="rounded-3xl border border-orange-100 bg-orange-50 p-6 text-orange-950 shadow-sm">
+            <div class="flex flex-col justify-between gap-4 md:flex-row md:items-start">
+              <div>
+                <LightBulbIcon class="h-7 w-7 text-orange-600" />
+                <p class="mt-6 text-xs font-semibold uppercase tracking-[0.18em] text-orange-700">
+                  AI report path
+                </p>
+                <h3 class="mt-3 text-2xl font-semibold leading-8 text-stage-950">
+                  Local signals become a stable parent note.
+                </h3>
+                <p class="mt-3 text-sm leading-6 text-orange-900/70">
+                  {{ qwenProofText }}
+                </p>
+              </div>
+            </div>
+            <div class="mt-5 grid gap-2">
+              <div
+                v-for="step in aiProofSteps"
+                :key="step.label"
+                class="rounded-2xl bg-white/70 p-3"
+              >
+                <p class="text-sm font-semibold text-stage-950">{{ step.label }}</p>
+                <p class="mt-1 text-xs leading-5 text-stone-500">{{ step.detail }}</p>
+              </div>
+            </div>
+          </article>
+
+          <article class="rounded-3xl border border-lime-200 bg-lime-50 p-6 text-lime-950 shadow-sm">
+            <EyeIcon class="h-7 w-7 text-lime-700" />
+            <p class="mt-6 text-xs font-semibold uppercase tracking-[0.18em] text-lime-700">
+              Privacy promise
+            </p>
+            <h3 class="mt-3 text-3xl font-semibold leading-9 text-stage-950">
+              No raw video or audio stored.
+            </h3>
+            <p class="mt-4 text-sm leading-6 text-lime-900/75">
+              Bowly keeps only structured practice signals and anonymous body points for the parent report.
+            </p>
+            <span class="mt-6 inline-flex items-center gap-2 rounded-full bg-white/70 px-3 py-1.5 text-xs font-semibold text-lime-800 ring-1 ring-lime-200">
+              <CheckCircleIcon class="h-4 w-4" />
+              private by design
+            </span>
+          </article>
         </div>
 
         <div class="mt-5 grid gap-5 lg:grid-cols-[1.4fr_1fr]">
           <article class="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm sm:p-6">
-            <div class="flex flex-col justify-between gap-4 md:flex-row md:items-start">
-              <div>
-                <p class="section-kicker">AI report path</p>
-                <h3 class="mt-2 text-2xl font-semibold text-stage-950">
-                  Local signals become a stable parent note.
-                </h3>
-                <p class="mt-2 max-w-2xl text-sm leading-6 text-stone-500">
-                  {{ qwenProofText }}
-                </p>
-              </div>
-              <span class="inline-flex items-center gap-2 rounded-full bg-lime-50 px-3 py-1.5 text-xs font-semibold text-lime-800 ring-1 ring-lime-200">
-                <CheckCircleIcon class="h-4 w-4" />
-                fallback ready
-              </span>
-            </div>
-            <div class="mt-6 grid gap-3 md:grid-cols-3">
-              <div
-                v-for="step in aiProofSteps"
-                :key="step.label"
-                class="rounded-2xl bg-stone-50 p-4"
+            <p class="section-kicker">Today's practice report</p>
+            <div class="mt-4 grid gap-3 sm:grid-cols-3">
+              <article
+                v-for="stat in reportMetricStats"
+                :key="stat.label"
+                class="rounded-2xl p-4 ring-1 ring-inset ring-black/5"
+                :class="stat.tone"
               >
-                <p class="text-sm font-semibold text-stage-950">{{ step.label }}</p>
-                <p class="mt-1 text-sm leading-6 text-stone-500">{{ step.detail }}</p>
-              </div>
+                <component :is="stat.icon" class="h-5 w-5" />
+                <p class="mt-3 text-xs font-semibold uppercase tracking-[0.12em] opacity-65">
+                  {{ stat.label }}
+                </p>
+                <p class="mt-1 text-2xl font-semibold">{{ stat.value }}</p>
+                <p class="mt-1 text-xs leading-5 opacity-70">{{ stat.detail }}</p>
+              </article>
             </div>
           </article>
 
@@ -661,40 +683,6 @@ onMounted(async () => {
       </section>
 
       <div v-if="latestSession" class="mt-5 grid gap-5 md:grid-cols-3">
-        <article class="light-card">
-          <ClockIcon class="h-7 w-7 text-bowly-500" />
-          <p class="mt-5 text-sm text-stone-500">Practice duration</p>
-          <p class="mt-1 text-3xl font-semibold">
-            {{
-              latestSession.durationSeconds < 60
-                ? "<1 min"
-                : `${Math.round(latestSession.durationSeconds / 60)} min`
-            }}
-          </p>
-        </article>
-        <article class="light-card">
-          <PlayCircleIcon class="h-7 w-7 text-lime-600" />
-          <p class="mt-5 text-sm text-stone-500">Playing sections</p>
-          <p class="mt-1 text-3xl font-semibold">{{ activity?.phraseCount ?? "--" }}</p>
-          <p class="mt-1 text-xs text-stone-400">
-            Longest {{ Math.round(activity?.longestContinuousSeconds ?? 0) }} sec
-          </p>
-        </article>
-        <article class="light-card">
-          <MusicalNoteIcon class="h-7 w-7 text-orange-500" />
-          <p class="mt-5 text-sm text-stone-500">Near the closest standard note</p>
-          <p class="mt-1 text-3xl font-semibold">
-            {{ (activity?.pitchedSeconds ?? 0) >= 12 ? `${activity?.inTunePercent}%` : "--" }}
-          </p>
-          <p class="mt-1 text-xs text-stone-400">
-            {{
-              (activity?.pitchedSeconds ?? 0) >= 12
-                ? "Uses a comfortable +/-20 cent range"
-                : "Not enough clear pitch data"
-            }}
-          </p>
-        </article>
-
         <article class="light-card md:col-span-2">
           <p class="section-kicker">What went well today</p>
           <p class="mt-4 text-xl leading-8 text-stage-900">
