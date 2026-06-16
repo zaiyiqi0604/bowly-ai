@@ -29,7 +29,7 @@ const latestSession = computed(() => memoryStore.latestSession);
 const activity = computed(() => latestSession.value?.activity);
 const continuityInsight = computed(() => {
   const durations = activity.value?.phraseDurationsSeconds ?? [];
-  if (durations.length < 4) return "Not enough sections for an early-to-late comparison.";
+  if (durations.length < 4) return "A few more playing sections will make this trend more reliable.";
   const midpoint = Math.ceil(durations.length / 2);
   const average = (values: number[]) =>
     values.reduce((sum, value) => sum + value, 0) / values.length;
@@ -45,7 +45,6 @@ const reviewMoments = computed(() =>
     .sort((a, b) => b.totalDurationSeconds - a.totalDurationSeconds)
     .slice(0, 3)
 );
-const primaryReview = computed(() => reviewMoments.value[0] ?? null);
 const postureMoments = computed(() =>
   reviewMoments.value.filter((moment) => moment.category === "posture"),
 );
@@ -161,13 +160,13 @@ function average(values: number[]) {
     : 0;
 }
 function trendLabel(values: number[], unit: string) {
-  if (values.length < 3) return "Keep practising to reveal this trend";
+  if (values.length < 3) return "Keep practicing to reveal this trend";
   const midpoint = Math.ceil(values.length / 2);
   const early = average(values.slice(0, midpoint));
   const later = average(values.slice(midpoint));
-  if (later > early * 1.1) return `Improving · ${Math.round(later)}${unit} recently`;
-  if (later < early * 0.9) return `Changing · ${Math.round(later)}${unit} recently`;
-  return `Steady · about ${Math.round(later)}${unit}`;
+  if (later > early * 1.1) return `Improving - ${Math.round(later)}${unit} recently`;
+  if (later < early * 0.9) return `Changing - ${Math.round(later)}${unit} recently`;
+  return `Steady - about ${Math.round(later)}${unit}`;
 }
 const practiceDaysLast7 = computed(() => {
   const today = Date.now();
@@ -247,8 +246,17 @@ function setupSuggestion(key: string) {
   if (key === "too-far") {
     return "Keep both hands visible. Only move the phone slightly closer if tracking is still unclear.";
   }
+  if (key === "too-close") {
+    return "Move the phone slightly farther away so both hands and the bow fit in the frame.";
+  }
   if (key === "off-center") {
     return "Center the player while keeping both hands and the bow inside the frame.";
+  }
+  if (key === "body-not-visible") {
+    return "Step back or tilt the phone until the shoulders and instrument are visible.";
+  }
+  if (key === "arms-not-visible") {
+    return "Keep both arms and the bow inside the camera view before starting the next phrase.";
   }
   return "Place the phone slightly farther away or turn it sideways so both hands and the bow remain visible.";
 }
@@ -259,16 +267,16 @@ const fallbackSuggestion = computed(() =>
 );
 const aiStatusLabel = computed(() => {
   if (!aiStatus.value) return "AI status unavailable";
-  if (aiStatus.value.provider === "qwen") return `Qwen Live · ${aiStatus.value.model}`;
-  if (aiStatus.value.provider === "mock-fallback") return "Qwen unavailable · Mock fallback";
+  if (aiStatus.value.provider === "qwen") return `AI summary ready - ${aiStatus.value.model}`;
+  if (aiStatus.value.provider === "mock-fallback") return "Local summary active";
   if (aiStatus.value.mode === "live") {
     return aiStatus.value.keyConfigured
-      ? `Qwen configured · ${aiStatus.value.model}`
-      : "Live mode · API key missing";
+      ? `AI connection pending - ${aiStatus.value.model}`
+      : "AI connection needs setup";
   }
   return aiStatus.value.keyConfigured
-    ? "Mock mode · API key configured"
-    : "Mock mode · API key not configured";
+    ? "Demo summary active"
+    : "Demo summary active";
 });
 const aiStatusTone = computed(() => {
   if (aiStatus.value?.provider === "qwen") return "bg-lime-50 text-lime-800 ring-lime-200";
@@ -283,27 +291,27 @@ const aiStatusTone = computed(() => {
 const qwenProofText = computed(() => {
   const responseAi = report.value?.ai;
   if (responseAi?.provider === "qwen") {
-    return `This report response came from live Qwen (${responseAi.model}).`;
+    return "AI helped turn today's practice data into this parent-friendly summary.";
   }
   if (responseAi?.provider === "mock-fallback") {
-    return `Qwen fallback was used for this report: ${responseAi.lastError ?? "provider unavailable"}.`;
+    return "Bowly used a local summary so the report stayed available.";
   }
   if (responseAi?.provider === "mock") {
-    return "This report response used mock mode while preserving the same report contract.";
+    return "This demo uses the same report structure with stable sample data.";
   }
   if (aiStatus.value?.provider === "qwen") {
-    return "Live Qwen converted structured practice signals into this parent reflection.";
+    return "AI helped turn today's practice data into this parent-friendly summary.";
   }
   if (aiStatus.value?.provider === "mock-fallback") {
-    return "Qwen was unavailable, so Bowly kept the session usable with a deterministic fallback.";
+    return "Bowly used a local summary so the report stayed available.";
   }
   if (aiStatus.value?.mode === "live" && aiStatus.value.keyConfigured) {
-    return "Live Qwen is configured; the report uses local summary text until a successful Qwen response arrives.";
+    return "Bowly is ready to use AI when the cloud report finishes in time.";
   }
   if (aiStatus.value?.mode === "live" && !aiStatus.value.keyConfigured) {
-    return "Live mode needs a Qwen API key before cloud reflection can run.";
+    return "Bowly can still create a local practice summary while AI is being set up.";
   }
-  return "Mock mode keeps the demo stable while preserving the same report contract.";
+  return "The demo keeps a stable parent report for review.";
 });
 const localSignalText = computed(() => {
   const phraseCount = activity.value?.phraseCount ?? 0;
@@ -312,6 +320,23 @@ const localSignalText = computed(() => {
     return `${phraseCount} playing sections captured locally; longest phrase ${longest} sec.`;
   }
   return "Camera and microphone signals are summarized locally before any cloud reasoning.";
+});
+const sessionDetailCards = computed(() => {
+  const cards: string[] = [];
+  if (report.value?.postureInsight) {
+    cards.push(report.value.postureInsight);
+  } else if (postureMoments.value.length) {
+    cards.push(`Bowly noticed ${postureMoments.value[0]?.title.toLowerCase()} and suggests: ${focusText.value}`);
+  } else {
+    cards.push("No repeated playing-position issue stood out today.");
+  }
+
+  if (report.value?.memoryInsight) {
+    cards.push(report.value.memoryInsight);
+  } else {
+    cards.push(continuityInsight.value);
+  }
+  return cards;
 });
 
 onMounted(async () => {
@@ -327,7 +352,7 @@ onMounted(async () => {
     aiStatus.value = (await fetchBackendHealth()).ai;
   } catch (error) {
     console.error(error);
-    errorText.value = "Using local summary because report service is unavailable.";
+    errorText.value = "Showing a local summary because the cloud report did not finish in time.";
   } finally {
     loading.value = false;
   }
@@ -468,9 +493,9 @@ onMounted(async () => {
       <p class="section-kicker">Progress overview</p>
       <div class="mt-3 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
-          <h1 class="text-4xl font-semibold tracking-tight text-stage-950">Parent Practice Report</h1>
+          <h1 class="text-4xl font-semibold tracking-tight text-stage-950">Today's Practice Report</h1>
           <p class="mt-3 max-w-2xl text-stone-500">
-            A factual summary of local practice signals, Qwen reflection, and one useful next step.
+            A simple summary of today's practice, what went well, and one calm next step.
           </p>
         </div>
         <div class="flex flex-col items-start gap-3 sm:items-end">
@@ -494,9 +519,9 @@ onMounted(async () => {
       <div v-else class="mt-8 rounded-3xl border border-bowly-100 bg-white p-5 shadow-sm sm:p-6">
         <div class="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
           <div>
-            <p class="section-kicker">Hackathon proof</p>
+            <p class="section-kicker">Privacy & AI proof</p>
             <h2 class="mt-2 text-2xl font-semibold text-stage-950">
-              Private edge perception became a useful family update.
+              Bowly turns private on-device observations into a family-friendly practice note.
             </h2>
           </div>
           <span class="inline-flex items-center gap-2 rounded-full bg-lime-50 px-3 py-1.5 text-xs font-semibold text-lime-800 ring-1 ring-lime-200">
@@ -507,17 +532,17 @@ onMounted(async () => {
         <div class="mt-5 grid gap-3 md:grid-cols-3">
           <article class="rounded-2xl bg-bowly-50 p-4">
             <CameraIcon class="h-6 w-6 text-bowly-700" />
-            <p class="mt-3 text-sm font-semibold text-stage-950">Local signals</p>
+            <p class="mt-3 text-sm font-semibold text-stage-950">What Bowly noticed on this device</p>
             <p class="mt-1 text-sm leading-6 text-stone-600">{{ localSignalText }}</p>
           </article>
           <article class="rounded-2xl bg-orange-50 p-4">
             <LightBulbIcon class="h-6 w-6 text-orange-600" />
-            <p class="mt-3 text-sm font-semibold text-stage-950">Qwen reflection</p>
+            <p class="mt-3 text-sm font-semibold text-stage-950">AI-written parent summary</p>
             <p class="mt-1 text-sm leading-6 text-stone-600">{{ qwenProofText }}</p>
           </article>
           <article class="rounded-2xl bg-lime-50 p-4">
             <CheckCircleIcon class="h-6 w-6 text-lime-700" />
-            <p class="mt-3 text-sm font-semibold text-stage-950">Gentle next step</p>
+            <p class="mt-3 text-sm font-semibold text-stage-950">One thing to try next</p>
             <p class="mt-1 text-sm leading-6 text-stone-600">{{ report?.tomorrowSuggestion ?? fallbackSuggestion }}</p>
           </article>
         </div>
@@ -538,7 +563,7 @@ onMounted(async () => {
         <article class="light-card">
           <PlayCircleIcon class="h-7 w-7 text-lime-600" />
           <p class="mt-5 text-sm text-stone-500">Playing sections</p>
-          <p class="mt-1 text-3xl font-semibold">{{ activity?.phraseCount ?? "—" }}</p>
+          <p class="mt-1 text-3xl font-semibold">{{ activity?.phraseCount ?? "--" }}</p>
           <p class="mt-1 text-xs text-stone-400">
             Longest {{ Math.round(activity?.longestContinuousSeconds ?? 0) }} sec
           </p>
@@ -547,28 +572,29 @@ onMounted(async () => {
           <MusicalNoteIcon class="h-7 w-7 text-orange-500" />
           <p class="mt-5 text-sm text-stone-500">Near the closest standard note</p>
           <p class="mt-1 text-3xl font-semibold">
-            {{ (activity?.pitchedSeconds ?? 0) >= 12 ? `${activity?.inTunePercent}%` : "—" }}
+            {{ (activity?.pitchedSeconds ?? 0) >= 12 ? `${activity?.inTunePercent}%` : "--" }}
           </p>
           <p class="mt-1 text-xs text-stone-400">
             {{
               (activity?.pitchedSeconds ?? 0) >= 12
-                ? "Uses a comfortable ±20 cent range"
+                ? "Uses a comfortable +/-20 cent range"
                 : "Not enough clear pitch data"
             }}
           </p>
         </article>
 
         <article class="light-card md:col-span-2">
-          <p class="section-kicker">Session highlights</p>
+          <p class="section-kicker">What went well today</p>
           <p class="mt-4 text-xl leading-8 text-stage-900">
             {{ report?.summary ?? latestSession.coachHighlights.join(" ") }}
           </p>
           <div class="mt-7 grid gap-4 sm:grid-cols-2">
-            <div class="rounded-xl bg-stone-50 p-4 text-sm leading-6 text-stone-600">
-              {{ report?.postureInsight ?? "No persistent camera-view issue was recorded." }}
-            </div>
-            <div class="rounded-xl bg-stone-50 p-4 text-sm leading-6 text-stone-600">
-              {{ report?.memoryInsight ?? continuityInsight }}
+            <div
+              v-for="detail in sessionDetailCards"
+              :key="detail"
+              class="rounded-xl bg-stone-50 p-4 text-sm leading-6 text-stone-600"
+            >
+              {{ detail }}
             </div>
           </div>
         </article>
@@ -629,12 +655,12 @@ onMounted(async () => {
         <section class="light-card md:col-span-3">
           <div class="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
             <div>
-              <p class="section-kicker">Practice reflections</p>
+              <p class="section-kicker">Helpful practice notes</p>
               <h2 class="mt-2 text-2xl font-semibold text-stage-950">
                 Practice observations
               </h2>
               <p class="mt-2 max-w-2xl text-sm leading-6 text-stone-500">
-                Movement suggestions and camera setup issues are explained separately. Original video is not stored.
+                Bowly uses anonymous body points to explain useful practice notes. Original video is not stored.
               </p>
             </div>
             <span class="inline-flex items-center gap-2 text-sm text-lime-700">
@@ -655,12 +681,12 @@ onMounted(async () => {
                     class="mb-2 text-xs font-semibold uppercase tracking-[0.16em]"
                     :class="moment.category === 'posture' ? 'text-bowly-600' : 'text-stone-500'"
                   >
-                    {{ moment.category === "posture" ? "Movement observation" : "Camera setup" }}
+                    {{ moment.category === "posture" ? "Playing position note" : "Camera view note" }}
                   </p>
                   <h3 class="text-lg font-semibold text-stage-950">{{ moment.title }}</h3>
                   <p class="mt-1 text-sm text-stone-500">
                     Seen {{ moment.occurrences }} {{ moment.occurrences === 1 ? "time" : "times" }}
-                    · {{ moment.totalDurationSeconds }} sec total
+                    - {{ moment.totalDurationSeconds }} sec total
                   </p>
                 </div>
                 <p class="max-w-md text-sm leading-6 text-stone-600">{{ moment.suggestion }}</p>
@@ -674,7 +700,7 @@ onMounted(async () => {
                   {{
                     moment.category === "posture"
                       ? "What this means"
-                      : "This is a setup issue, not a movement mistake"
+                      : "This was about the camera view, not your child's playing"
                   }}
                 </p>
                 <p class="mt-2 text-sm leading-6 text-stone-600">
@@ -696,14 +722,14 @@ onMounted(async () => {
               <div class="mt-5 grid gap-4 md:grid-cols-2">
                 <div>
                   <p class="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-bowly-600">
-                    Edge evidence captured
+                    What Bowly checked
                   </p>
                   <PoseSnapshot :snapshot="moment.before" tone="before" />
                 </div>
                 <div>
                   <p class="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-lime-700">
                     <CheckCircleIcon class="h-4 w-4" />
-                    {{ moment.after ? "View restored later" : "Setup for next time" }}
+                    {{ moment.after ? "Movement improved later" : "Setup for next time" }}
                   </p>
                   <PoseSnapshot
                     v-if="moment.after"
@@ -727,27 +753,6 @@ onMounted(async () => {
               Bowly stays quiet when there is not enough reliable evidence for a movement suggestion.
             </p>
           </div>
-        </section>
-
-        <section
-          v-if="false"
-          class="rounded-2xl bg-gradient-to-br from-bowly-600 to-bowly-800 p-6 text-white shadow-sm md:col-span-3"
-        >
-          <p class="text-xs font-semibold uppercase tracking-[0.18em] text-bowly-100">
-            Child-friendly recap
-          </p>
-          <p class="mt-3 text-2xl font-semibold">
-            {{
-              primaryReview.after
-                ? "You kept going after the camera view became clear."
-                : "You found one useful setup idea for next time."
-            }}
-          </p>
-          <p class="mt-3 max-w-3xl text-sm leading-7 text-white/75">
-            Bowly noticed {{ primaryReview.title.toLowerCase() }}.
-            Before the next phrase:
-            {{ primaryReview.suggestion }}
-          </p>
         </section>
       </div>
       <p v-if="loading" class="mt-6 text-sm text-stone-500">Building gentle report...</p>
