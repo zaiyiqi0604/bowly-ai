@@ -28,7 +28,7 @@ const MemorySummarySchema = z.object({
   trend: z.string(),
 });
 
-const QWEN_TIMEOUT_MS = Number(process.env.QWEN_TIMEOUT_MS ?? 12000);
+const QWEN_TIMEOUT_MS = Number(process.env.QWEN_TIMEOUT_MS ?? 30000);
 
 interface StructuredResponseOptions {
   model?: string;
@@ -141,7 +141,7 @@ Fields: summary, postureInsight, motivationLevel, tomorrowSuggestion, memoryInsi
 Rules: use only input facts; no invented emotion/progress; framing means camera view only; keep each field one short sentence.
 Input: ${JSON.stringify(compactInput)}`,
     {
-      model: process.env.QWEN_REPORT_MODEL ?? process.env.QWEN_MODEL ?? "qwen-plus",
+      model: process.env.QWEN_REPORT_MODEL ?? "qwen3.6-flash",
       maxTokens: Number(process.env.QWEN_REPORT_MAX_TOKENS ?? 320),
       temperature: 0.2,
     }

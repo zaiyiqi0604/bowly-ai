@@ -66,7 +66,7 @@ export function getAiRuntimeStatus(): AiRuntimeStatus {
     provider: mockMode ? "mock" : runtimeStatus.provider,
     keyConfigured,
     model: process.env.QWEN_MODEL ?? "qwen-plus",
-    reportModel: process.env.QWEN_REPORT_MODEL ?? process.env.QWEN_MODEL ?? "qwen-plus",
+    reportModel: process.env.QWEN_REPORT_MODEL ?? "qwen3.6-flash",
     lastRequestAt: runtimeStatus.lastRequestAt,
     lastError:
       !mockMode && !keyConfigured
@@ -147,7 +147,7 @@ function timeoutAfter<T>(milliseconds: number, message: string): Promise<T> {
 }
 
 function getReportQwenTimeoutMs() {
-  return Number(process.env.REPORT_QWEN_TIMEOUT_MS ?? 8000);
+  return Number(process.env.REPORT_QWEN_TIMEOUT_MS ?? 25000);
 }
 
 export async function generateCoachFeedback(
