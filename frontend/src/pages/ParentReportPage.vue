@@ -8,7 +8,6 @@ import {
   CheckCircleIcon,
   ClockIcon,
   EyeIcon,
-  LightBulbIcon,
   MusicalNoteIcon,
   PlayCircleIcon,
   StarIcon,
@@ -25,6 +24,8 @@ const report = ref<ParentReportResponse | null>(null);
 const aiStatus = ref<AiRuntimeStatus | null>(null);
 const errorText = ref("");
 const showParentReport = ref(false);
+const showProgressDetails = ref(false);
+const showObservationDetails = ref(false);
 const latestSession = computed(() => memoryStore.latestSession);
 const activity = computed(() => latestSession.value?.activity);
 const continuityInsight = computed(() => {
@@ -663,49 +664,25 @@ onMounted(async () => {
           </p>
         </article>
 
-        <div class="grid gap-5 lg:grid-cols-[0.9fr_1.35fr_0.95fr]">
-          <div class="space-y-5">
-            <article class="rounded-3xl border border-bowly-100 bg-bowly-50 p-6 text-bowly-950 shadow-sm">
-              <div class="flex items-center justify-between gap-3">
-                <CameraIcon class="h-8 w-8 text-bowly-600" />
-                <span class="rounded-full bg-white px-3 py-1 text-xs font-semibold text-bowly-700 ring-1 ring-bowly-200">
-                  instant local fact
-                </span>
-              </div>
-              <p class="mt-6 text-xs font-semibold uppercase tracking-[0.18em] text-bowly-600">
-                Local perception
-              </p>
-              <p class="mt-3 text-5xl font-semibold leading-none">{{ activity?.phraseCount ?? 0 }}</p>
-              <p class="mt-2 font-semibold leading-7 text-stage-950">sections captured on device</p>
-              <div class="mt-6 space-y-3 border-t border-bowly-200/70 pt-5 text-sm leading-6 text-bowly-900/75">
-                <p>Longest phrase <strong>{{ Math.round(activity?.longestContinuousSeconds ?? 0) }} sec</strong></p>
-                <p>{{ reviewMoments.length }} private movement {{ reviewMoments.length === 1 ? "moment" : "moments" }}</p>
-                <p>{{ activity?.pitchDataQuality ?? "insufficient" }} pitch data</p>
-              </div>
-            </article>
-
-            <article class="rounded-3xl border border-lime-200 bg-lime-50 p-6 text-lime-950 shadow-sm">
-              <div class="flex items-center justify-between gap-3">
-                <EyeIcon class="h-7 w-7 text-lime-700" />
-                <span class="rounded-full bg-white px-3 py-1 text-xs font-semibold text-lime-800 ring-1 ring-lime-200">
-                  instant local fact
-                </span>
-              </div>
-              <p class="mt-5 text-xs font-semibold uppercase tracking-[0.18em] text-lime-700">
-                Privacy proof
-              </p>
-              <h3 class="mt-3 text-xl font-semibold leading-7 text-stage-950">
-                No raw video or audio stored.
-              </h3>
-              <p class="mt-3 text-sm leading-6 text-lime-900/75">
-                Only structured practice signals and anonymous body points are used.
-              </p>
-              <span class="mt-5 inline-flex items-center gap-2 rounded-full bg-white/70 px-3 py-1.5 text-xs font-semibold text-lime-800 ring-1 ring-lime-200">
-                <CheckCircleIcon class="h-4 w-4" />
-                private by design
+        <div class="grid gap-5 lg:grid-cols-[0.85fr_1.35fr_1fr]">
+          <article class="rounded-3xl border border-bowly-100 bg-bowly-50 p-6 text-bowly-950 shadow-sm">
+            <div class="flex items-center justify-between gap-3">
+              <CameraIcon class="h-8 w-8 text-bowly-600" />
+              <span class="rounded-full bg-white px-3 py-1 text-xs font-semibold text-bowly-700 ring-1 ring-bowly-200">
+                local signals
               </span>
-            </article>
-          </div>
+            </div>
+            <p class="mt-6 text-xs font-semibold uppercase tracking-[0.18em] text-bowly-600">
+              Local perception
+            </p>
+            <p class="mt-3 text-5xl font-semibold leading-none">{{ activity?.phraseCount ?? 0 }}</p>
+            <p class="mt-2 font-semibold leading-7 text-stage-950">sections captured on device</p>
+            <div class="mt-6 space-y-3 border-t border-bowly-200/70 pt-5 text-sm leading-6 text-bowly-900/75">
+              <p>Longest phrase <strong>{{ Math.round(activity?.longestContinuousSeconds ?? 0) }} sec</strong></p>
+              <p>{{ reviewMoments.length }} private movement {{ reviewMoments.length === 1 ? "moment" : "moments" }}</p>
+              <p>{{ activity?.pitchDataQuality ?? "insufficient" }} pitch data</p>
+            </div>
+          </article>
 
           <article class="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm sm:p-6">
             <div class="flex items-center justify-between gap-3">
@@ -759,25 +736,33 @@ onMounted(async () => {
             </p>
           </article>
 
-          <article class="rounded-3xl border border-blue-100 bg-blue-50 p-6 text-blue-950 shadow-sm">
-            <CheckCircleIcon class="h-8 w-8 text-blue-600" />
-            <h3 class="mt-6 text-2xl font-semibold leading-8 text-stage-950">
-              If AI is slow, Bowly keeps the local summary.
-            </h3>
-            <p class="mt-4 text-sm leading-6 text-blue-900/75">
-              You will always see a helpful report based on the child&apos;s practice.
+          <article class="rounded-3xl border border-lime-200 bg-lime-50 p-6 text-lime-950 shadow-sm">
+            <div class="flex items-center justify-between gap-3">
+              <EyeIcon class="h-7 w-7 text-lime-700" />
+              <span class="rounded-full bg-white px-3 py-1 text-xs font-semibold text-lime-800 ring-1 ring-lime-200">
+                privacy + fallback
+              </span>
+            </div>
+            <p class="mt-6 text-xs font-semibold uppercase tracking-[0.18em] text-lime-700">
+              Privacy & reliability
             </p>
-            <div class="mt-6 space-y-3 text-sm font-medium text-blue-900">
+            <h3 class="mt-3 text-2xl font-semibold leading-8 text-stage-950">
+              No raw video or audio stored.
+            </h3>
+            <p class="mt-4 text-sm leading-6 text-lime-900/75">
+              Bowly keeps structured practice signals only, and the local summary stays visible if AI is slow.
+            </p>
+            <div class="mt-6 space-y-3 text-sm font-medium text-lime-900">
               <p class="flex items-center gap-2">
-                <CheckCircleIcon class="h-5 w-5 text-blue-500" />
+                <CheckCircleIcon class="h-5 w-5 text-lime-700" />
+                Raw media is not stored
+              </p>
+              <p class="flex items-center gap-2">
+                <CheckCircleIcon class="h-5 w-5 text-lime-700" />
                 Local facts are always available
               </p>
               <p class="flex items-center gap-2">
-                <CheckCircleIcon class="h-5 w-5 text-blue-500" />
-                AI wording improves the parent note
-              </p>
-              <p class="flex items-center gap-2">
-                <CheckCircleIcon class="h-5 w-5 text-blue-500" />
+                <CheckCircleIcon class="h-5 w-5 text-lime-700" />
                 Nothing is lost if AI is slow
               </p>
             </div>
@@ -786,7 +771,7 @@ onMounted(async () => {
 
         <article class="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm sm:p-6">
           <p class="section-kicker">Today's practice report</p>
-          <div class="mt-4 grid gap-3 lg:grid-cols-[1fr_1fr_1fr_1.25fr]">
+          <div class="mt-4 grid gap-3 md:grid-cols-3">
             <article
               v-for="stat in reportMetricStats"
               :key="stat.label"
@@ -805,84 +790,93 @@ onMounted(async () => {
               <p class="mt-1 text-2xl font-semibold">{{ stat.value }}</p>
               <p class="mt-1 text-xs leading-5 opacity-70">{{ stat.detail }}</p>
             </article>
-            <article class="rounded-2xl bg-stage-900 p-5 text-white shadow-sm">
-              <LightBulbIcon class="h-6 w-6 text-orange-300" />
-              <p class="mt-4 text-xs font-semibold uppercase tracking-[0.14em] text-orange-300">
-                Tomorrow's suggestion
-              </p>
-              <p class="mt-3 text-lg font-semibold leading-7">
-                {{ report?.tomorrowSuggestion ?? fallbackSuggestion }}
-              </p>
-            </article>
           </div>
         </article>
       </section>
 
       <div v-if="latestSession" class="mt-5 grid gap-5 md:grid-cols-3">
-        <section class="light-card md:col-span-3">
-          <div class="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
+        <section class="rounded-2xl border border-stone-200/80 bg-white shadow-sm md:col-span-3">
+          <div class="flex flex-col justify-between gap-3 p-5 sm:flex-row sm:items-center">
             <div>
               <p class="section-kicker">Recent progress</p>
               <h2 class="mt-2 text-2xl font-semibold text-stage-950">Long-term trends</h2>
               <p class="mt-2 text-sm leading-6 text-stone-500">
-                Based on up to five recent sessions. Trends appear only after enough practice data is available.
+                {{ validSessions.length }} recorded sessions. Open this only when judges ask about retention or progress over time.
               </p>
             </div>
-            <span class="text-sm text-stone-400">{{ validSessions.length }} recorded sessions</span>
-          </div>
-          <div class="mt-6 grid gap-4 md:grid-cols-3">
-            <article
-              v-for="trend in longTermTrends"
-              :key="trend.label"
-              class="rounded-2xl p-5"
-              :class="trend.tone"
+            <button
+              type="button"
+              class="inline-flex items-center justify-center rounded-xl border border-stone-200 px-4 py-2 text-sm font-semibold text-stage-900 hover:bg-stone-50"
+              @click="showProgressDetails = !showProgressDetails"
             >
-              <component :is="trend.icon" class="h-6 w-6" />
-              <p class="mt-4 text-sm font-semibold opacity-70">{{ trend.label }}</p>
-              <p class="mt-2 text-lg font-semibold leading-7">{{ trend.value }}</p>
-              <p class="mt-1 text-xs leading-5 opacity-65">{{ trend.detail }}</p>
-            </article>
+              {{ showProgressDetails ? "Hide details" : "Show trends" }}
+            </button>
           </div>
-          <div class="mt-6 border-t border-stone-100 pt-5">
-            <div class="flex items-center justify-between">
-              <h3 class="font-semibold text-stage-950">Achievements</h3>
-              <span class="text-sm text-stone-400">{{ unlockedBadgeCount }} unlocked</span>
-            </div>
-            <div class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <div
-                v-for="badge in badges"
-                :key="badge.id"
-                class="rounded-xl border p-4"
-                :class="badge.unlocked
-                  ? 'border-orange-200 bg-orange-50'
-                  : 'border-stone-200 bg-stone-50 opacity-50'"
+          <div v-if="showProgressDetails" class="border-t border-stone-100 p-5">
+            <div class="grid gap-4 md:grid-cols-3">
+              <article
+                v-for="trend in longTermTrends"
+                :key="trend.label"
+                class="rounded-2xl p-5"
+                :class="trend.tone"
               >
-                <TrophyIcon class="h-5 w-5" :class="badge.unlocked ? 'text-orange-600' : 'text-stone-400'" />
-                <p class="mt-3 font-semibold text-stage-950">{{ badge.name }}</p>
-                <p class="mt-1 text-xs leading-5 text-stone-500">{{ badge.description }}</p>
+                <component :is="trend.icon" class="h-6 w-6" />
+                <p class="mt-4 text-sm font-semibold opacity-70">{{ trend.label }}</p>
+                <p class="mt-2 text-lg font-semibold leading-7">{{ trend.value }}</p>
+                <p class="mt-1 text-xs leading-5 opacity-65">{{ trend.detail }}</p>
+              </article>
+            </div>
+            <div class="mt-6 border-t border-stone-100 pt-5">
+              <div class="flex items-center justify-between">
+                <h3 class="font-semibold text-stage-950">Achievements</h3>
+                <span class="text-sm text-stone-400">{{ unlockedBadgeCount }} unlocked</span>
+              </div>
+              <div class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div
+                  v-for="badge in badges"
+                  :key="badge.id"
+                  class="rounded-xl border p-4"
+                  :class="badge.unlocked
+                    ? 'border-orange-200 bg-orange-50'
+                    : 'border-stone-200 bg-stone-50 opacity-50'"
+                >
+                  <TrophyIcon class="h-5 w-5" :class="badge.unlocked ? 'text-orange-600' : 'text-stone-400'" />
+                  <p class="mt-3 font-semibold text-stage-950">{{ badge.name }}</p>
+                  <p class="mt-1 text-xs leading-5 text-stone-500">{{ badge.description }}</p>
+                </div>
               </div>
             </div>
           </div>
         </section>
 
-        <section class="light-card md:col-span-3">
-          <div class="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
+        <section class="rounded-2xl border border-stone-200/80 bg-white shadow-sm md:col-span-3">
+          <div class="flex flex-col justify-between gap-3 p-5 sm:flex-row sm:items-center">
             <div>
               <p class="section-kicker">Helpful practice notes</p>
               <h2 class="mt-2 text-2xl font-semibold text-stage-950">
                 Practice observations
               </h2>
               <p class="mt-2 max-w-2xl text-sm leading-6 text-stone-500">
-                Bowly uses anonymous body points to explain useful practice notes. Original video is not stored.
+                {{ reviewMoments.length ? `${reviewMoments.length} private movement note available.` : "No persistent movement concern was recorded." }}
+                Original video is not stored.
               </p>
             </div>
-            <span class="inline-flex items-center gap-2 text-sm text-lime-700">
-              <EyeIcon class="h-5 w-5" />
-              Private by design
-            </span>
+            <div class="flex items-center gap-3">
+              <span class="hidden items-center gap-2 text-sm text-lime-700 sm:inline-flex">
+                <EyeIcon class="h-5 w-5" />
+                Private by design
+              </span>
+              <button
+                type="button"
+                class="inline-flex items-center justify-center rounded-xl border border-stone-200 px-4 py-2 text-sm font-semibold text-stage-900 hover:bg-stone-50"
+                @click="showObservationDetails = !showObservationDetails"
+              >
+                {{ showObservationDetails ? "Hide notes" : "Show notes" }}
+              </button>
+            </div>
           </div>
 
-          <div v-if="reviewMoments.length" class="mt-7 space-y-6">
+          <div v-if="showObservationDetails && reviewMoments.length" class="space-y-6 border-t border-stone-100 p-5">
             <article
               v-for="moment in reviewMoments"
               :key="moment.id"
@@ -960,11 +954,13 @@ onMounted(async () => {
             </article>
           </div>
 
-          <div v-else class="mt-7 rounded-2xl bg-lime-50 p-6 text-lime-900">
+          <div v-else-if="showObservationDetails" class="border-t border-stone-100 p-5">
+          <div class="rounded-2xl bg-lime-50 p-6 text-lime-900">
             <p class="font-semibold">No persistent movement concern was recorded.</p>
             <p class="mt-2 text-sm leading-6 text-lime-800">
               Bowly stays quiet when there is not enough reliable evidence for a movement suggestion.
             </p>
+          </div>
           </div>
         </section>
       </div>
