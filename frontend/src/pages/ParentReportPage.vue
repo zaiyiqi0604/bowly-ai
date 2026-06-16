@@ -280,6 +280,29 @@ const aiStatusTone = computed(() => {
   }
   return "bg-stone-100 text-stone-600 ring-stone-200";
 });
+const qwenProofText = computed(() => {
+  if (aiStatus.value?.provider === "qwen") {
+    return "Live Qwen converted structured practice signals into this parent reflection.";
+  }
+  if (aiStatus.value?.provider === "mock-fallback") {
+    return "Qwen was unavailable, so Bowly kept the session usable with a deterministic fallback.";
+  }
+  if (aiStatus.value?.mode === "live" && aiStatus.value.keyConfigured) {
+    return "Live Qwen is configured; the report uses local summary text until a successful Qwen response arrives.";
+  }
+  if (aiStatus.value?.mode === "live" && !aiStatus.value.keyConfigured) {
+    return "Live mode needs a Qwen API key before cloud reflection can run.";
+  }
+  return "Mock mode keeps the demo stable while preserving the same report contract.";
+});
+const localSignalText = computed(() => {
+  const phraseCount = activity.value?.phraseCount ?? 0;
+  const longest = Math.round(activity.value?.longestContinuousSeconds ?? 0);
+  if (phraseCount > 0 && longest > 0) {
+    return `${phraseCount} playing sections captured locally; longest phrase ${longest} sec.`;
+  }
+  return "Camera and microphone signals are summarized locally before any cloud reasoning.";
+});
 
 onMounted(async () => {
   try {
@@ -436,7 +459,9 @@ onMounted(async () => {
       <div class="mt-3 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
           <h1 class="text-4xl font-semibold tracking-tight text-stage-950">Parent Practice Report</h1>
-          <p class="mt-3 text-stone-500">A factual summary of practice activity and one useful next step.</p>
+          <p class="mt-3 max-w-2xl text-stone-500">
+            A factual summary of local practice signals, Qwen reflection, and one useful next step.
+          </p>
         </div>
         <div class="flex flex-col items-start gap-3 sm:items-end">
           <span
@@ -456,7 +481,39 @@ onMounted(async () => {
         <p class="mt-2 text-sm text-stone-500">Complete a practice session to create the first report.</p>
       </div>
 
-      <div v-else class="mt-10 grid gap-5 md:grid-cols-3">
+      <div v-else class="mt-8 rounded-3xl border border-bowly-100 bg-white p-5 shadow-sm sm:p-6">
+        <div class="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
+          <div>
+            <p class="section-kicker">Hackathon proof</p>
+            <h2 class="mt-2 text-2xl font-semibold text-stage-950">
+              Private edge perception became a useful family update.
+            </h2>
+          </div>
+          <span class="inline-flex items-center gap-2 rounded-full bg-lime-50 px-3 py-1.5 text-xs font-semibold text-lime-800 ring-1 ring-lime-200">
+            <EyeIcon class="h-4 w-4" />
+            No raw video or audio stored
+          </span>
+        </div>
+        <div class="mt-5 grid gap-3 md:grid-cols-3">
+          <article class="rounded-2xl bg-bowly-50 p-4">
+            <CameraIcon class="h-6 w-6 text-bowly-700" />
+            <p class="mt-3 text-sm font-semibold text-stage-950">Local signals</p>
+            <p class="mt-1 text-sm leading-6 text-stone-600">{{ localSignalText }}</p>
+          </article>
+          <article class="rounded-2xl bg-orange-50 p-4">
+            <LightBulbIcon class="h-6 w-6 text-orange-600" />
+            <p class="mt-3 text-sm font-semibold text-stage-950">Qwen reflection</p>
+            <p class="mt-1 text-sm leading-6 text-stone-600">{{ qwenProofText }}</p>
+          </article>
+          <article class="rounded-2xl bg-lime-50 p-4">
+            <CheckCircleIcon class="h-6 w-6 text-lime-700" />
+            <p class="mt-3 text-sm font-semibold text-stage-950">Gentle next step</p>
+            <p class="mt-1 text-sm leading-6 text-stone-600">{{ report?.tomorrowSuggestion ?? fallbackSuggestion }}</p>
+          </article>
+        </div>
+      </div>
+
+      <div v-if="latestSession" class="mt-5 grid gap-5 md:grid-cols-3">
         <article class="light-card">
           <ClockIcon class="h-7 w-7 text-bowly-500" />
           <p class="mt-5 text-sm text-stone-500">Practice duration</p>
@@ -626,10 +683,10 @@ onMounted(async () => {
                 </p>
               </div>
 
-              <div class="hidden">
+              <div class="mt-5 grid gap-4 md:grid-cols-2">
                 <div>
                   <p class="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-bowly-600">
-                    Camera view to notice
+                    Edge evidence captured
                   </p>
                   <PoseSnapshot :snapshot="moment.before" tone="before" />
                 </div>

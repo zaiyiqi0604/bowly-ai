@@ -28,6 +28,8 @@ const MemorySummarySchema = z.object({
   trend: z.string(),
 });
 
+const QWEN_TIMEOUT_MS = Number(process.env.QWEN_TIMEOUT_MS ?? 12000);
+
 function createClient() {
   const apiKey = process.env.QWEN_API_KEY;
   if (!apiKey) {
@@ -35,6 +37,7 @@ function createClient() {
   }
   return new OpenAI({
     apiKey,
+    timeout: QWEN_TIMEOUT_MS,
     baseURL:
       process.env.QWEN_BASE_URL ?? "https://dashscope.aliyuncs.com/compatible-mode/v1",
   });

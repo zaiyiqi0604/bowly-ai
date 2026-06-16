@@ -1,5 +1,13 @@
 <script setup lang="ts">
+import { onMounted } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import { CheckCircleIcon, PlayCircleIcon } from "@heroicons/vue/24/outline";
+import { createDemoSessions } from "../demo/demoSessions";
+import { useMemoryStore } from "../stores/memory";
+
+const route = useRoute();
+const router = useRouter();
+const memoryStore = useMemoryStore();
 
 const demoScenes = [
   { title: "Welcome", detail: "Welcome back Emily. Let's try one small challenge today." },
@@ -9,6 +17,12 @@ const demoScenes = [
   { title: "Celebrate", detail: "Great work today. Challenge completed." },
   { title: "Report", detail: "Parent report generated with tomorrow's gentle suggestion." },
 ];
+
+onMounted(() => {
+  if (route.query.seed !== "report") return;
+  memoryStore.replaceDemoSessions(createDemoSessions());
+  void router.replace("/report");
+});
 </script>
 
 <template>

@@ -32,6 +32,24 @@ detector. It receives structured session context and decides how to express the
 next useful idea without harsh correction. The same Qwen integration generates
 parent reports and multi-session trend summaries.
 
+Example Qwen role:
+
+Local browser signals:
+
+- 3 playing sections.
+- Longest continuous phrase: 18 seconds.
+- One persistent setup issue: bow hand partly outside the frame.
+- Pitch data quality: limited.
+
+Qwen output:
+
+- Child note: "Nice focus. Before the next phrase, keep your bow hand where the
+  camera can see it."
+- Parent reflection: "Today was a short but completed practice. The main next
+  step is setup, not technique correction."
+- Fallback-safe structure: `summary`, `postureInsight`, `memoryInsight`, and
+  `tomorrowSuggestion`.
+
 Live integration:
 
 - Model: `qwen3.7-plus`

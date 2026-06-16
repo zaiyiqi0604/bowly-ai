@@ -40,13 +40,17 @@ function shouldUseMockMode() {
 
 export function getAiRuntimeStatus(): AiRuntimeStatus {
   const mockMode = shouldUseMockMode();
+  const keyConfigured = Boolean(process.env.QWEN_API_KEY?.trim());
   return {
     mode: mockMode ? "mock" : "live",
     provider: mockMode ? "mock" : runtimeStatus.provider,
-    keyConfigured: Boolean(process.env.QWEN_API_KEY?.trim()),
+    keyConfigured,
     model: process.env.QWEN_MODEL ?? "qwen-plus",
     lastRequestAt: runtimeStatus.lastRequestAt,
-    lastError: runtimeStatus.lastError,
+    lastError:
+      !mockMode && !keyConfigured
+        ? "Live mode is enabled but QWEN_API_KEY is not configured."
+        : runtimeStatus.lastError,
   };
 }
 

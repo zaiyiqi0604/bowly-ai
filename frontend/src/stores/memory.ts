@@ -33,5 +33,12 @@ export const useMemoryStore = defineStore("memory", {
       this.sessions.push(session);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(this.sessions));
     },
+    replaceDemoSessions(sessions: PracticeSessionRecord[]) {
+      const regularSessions = this.sessions.filter(
+        (session) => !session.id.startsWith("bowly-demo-")
+      );
+      this.sessions = [...regularSessions, ...sessions];
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(this.sessions));
+    },
   },
 });

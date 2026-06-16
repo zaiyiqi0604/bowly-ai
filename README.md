@@ -6,6 +6,25 @@ Bowly AI is a gentle AI music practice companion for young musicians.
 
 Using camera observation, audio intelligence, emotional coaching, and long-term progress memory, Bowly helps children practice violin with more confidence, consistency, and motivation.
 
+## Judge Demo Path
+
+1. Open `/demo` for the stable narrated flow.
+2. Open `/practice`, start a session, and play or hum a short phrase.
+3. Pause naturally: Bowly waits, then gives one calm suggestion.
+4. End practice and open `/report` to see the child recap, parent report, Qwen
+   status, and fallback state.
+
+What to look for: Bowly does not stream raw camera or audio to Qwen. The browser
+turns local posture and audio signals into structured practice events; Qwen
+turns those events into age-appropriate coaching and parent reflection.
+
+Before submitting or presenting, run through the
+[hackathon readiness checklist](docs/hackathon-readiness-checklist.md) and
+[final demo runbook](docs/final-demo-runbook.md).
+
+Stable report fallback: open `/demo?seed=report` to create a local seeded
+practice history and jump straight to `/report`.
+
 ## Qwen Cloud Hackathon
 
 Bowly targets **Track 5: EdgeAgent**.
@@ -17,6 +36,10 @@ Bowly targets **Track 5: EdgeAgent**.
 
 See the [architecture](docs/architecture.md) and
 [Devpost submission draft](docs/devpost-submission.md).
+
+For larger changes, use the lightweight
+[multi-agent operating model](docs/agent-roles.md) to split product, frontend,
+backend, deployment, and QA review responsibilities.
 
 Alibaba Cloud deployment instructions:
 [deploy/alibaba-cloud/README.md](deploy/alibaba-cloud/README.md).
