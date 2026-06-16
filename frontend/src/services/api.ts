@@ -26,7 +26,7 @@ async function fetchWithTimeout(
     });
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
-      throw new Error("API request timed out. Bowly can continue with local demo data or mock mode.");
+      throw new Error("The cloud service took too long to respond. Bowly can continue with a local summary.");
     }
     throw error;
   } finally {

@@ -39,12 +39,24 @@ const continuityInsight = computed(() => {
   if (later < early * 0.88) return "Later playing sections became shorter.";
   return "Playing-section length stayed consistent.";
 });
-const reviewMoments = computed(() =>
+const reliableReviewMoments = computed(() =>
   [...(latestSession.value?.reviewMoments ?? [])]
     .filter((moment) => (moment.confidence ?? 0) >= 0.8)
     .sort((a, b) => b.totalDurationSeconds - a.totalDurationSeconds)
-    .slice(0, 3)
 );
+const postureReviewMoments = computed(() =>
+  reliableReviewMoments.value.filter((moment) => moment.category === "posture"),
+);
+const framingReviewMoments = computed(() =>
+  reliableReviewMoments.value.filter((moment) => moment.category !== "posture"),
+);
+const reviewMoments = computed(() => {
+  if (!postureReviewMoments.value.length) return framingReviewMoments.value.slice(0, 3);
+  return [
+    ...postureReviewMoments.value.slice(0, 2),
+    ...framingReviewMoments.value.slice(0, 1),
+  ];
+});
 const postureMoments = computed(() =>
   reviewMoments.value.filter((moment) => moment.category === "posture"),
 );
@@ -73,7 +85,7 @@ const goodMoments = computed(() => {
   if ((activity.value?.phraseCount ?? 0) > 0) {
     items.push(`${activity.value?.phraseCount} playing sections completed.`);
   }
-  if (!postureMoments.value.length) items.push("No persistent posture concern was detected.");
+  if (!postureMoments.value.length) items.push("No repeated playing-position issue stood out today.");
   return items.slice(0, 2);
 });
 const previousSessions = computed(() => validSessions.value.slice(0, -1).slice(-3));
@@ -319,7 +331,14 @@ const localSignalText = computed(() => {
   if (phraseCount > 0 && longest > 0) {
     return `${phraseCount} playing sections captured locally; longest phrase ${longest} sec.`;
   }
-  return "Camera and microphone signals are summarized locally before any cloud reasoning.";
+  return "Camera and microphone signals are summarized locally before any optional AI summary.";
+});
+const aiStatusTooltip = computed(() => {
+  if (aiStatus.value?.provider === "qwen") return "The cloud AI summary completed successfully.";
+  if (aiStatus.value?.provider === "mock-fallback") {
+    return "The cloud AI summary did not finish, so Bowly kept the report available locally.";
+  }
+  return "Bowly can show a local parent summary even when cloud AI is still connecting.";
 });
 const sessionDetailCards = computed(() => {
   const cards: string[] = [];
@@ -502,7 +521,7 @@ onMounted(async () => {
           <span
             class="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold ring-1 ring-inset"
             :class="aiStatusTone"
-            :title="aiStatus?.lastError"
+            :title="aiStatusTooltip"
           >
             <span class="h-2 w-2 rounded-full bg-current opacity-70"></span>
             {{ aiStatusLabel }}
