@@ -26,6 +26,7 @@ export interface AiRuntimeStatus {
   provider: AiProvider;
   keyConfigured: boolean;
   model: string;
+  reportModel: string;
   lastRequestAt?: number;
   lastError?: string;
   calls: Record<AiOperation, AiCallStatus>;
@@ -65,6 +66,7 @@ export function getAiRuntimeStatus(): AiRuntimeStatus {
     provider: mockMode ? "mock" : runtimeStatus.provider,
     keyConfigured,
     model: process.env.QWEN_MODEL ?? "qwen-plus",
+    reportModel: process.env.QWEN_REPORT_MODEL ?? process.env.QWEN_MODEL ?? "qwen-plus",
     lastRequestAt: runtimeStatus.lastRequestAt,
     lastError:
       !mockMode && !keyConfigured

@@ -53,6 +53,8 @@ USE_MOCK_AI=false
 QWEN_API_KEY=<set in Function Compute only>
 QWEN_BASE_URL=https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1
 QWEN_MODEL=qwen3.7-plus
+QWEN_REPORT_MODEL=qwen-plus
+QWEN_REPORT_MAX_TOKENS=320
 QWEN_TIMEOUT_MS=12000
 REPORT_QWEN_TIMEOUT_MS=8000
 ```
@@ -167,6 +169,8 @@ USE_MOCK_AI=false
 QWEN_API_KEY=<set in SAE only>
 QWEN_BASE_URL=https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1
 QWEN_MODEL=qwen3.7-plus
+QWEN_REPORT_MODEL=qwen-plus
+QWEN_REPORT_MAX_TOKENS=320
 QWEN_TIMEOUT_MS=12000
 REPORT_QWEN_TIMEOUT_MS=8000
 ```

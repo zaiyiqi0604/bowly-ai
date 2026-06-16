@@ -49,6 +49,7 @@ export interface AiRuntimeStatus {
   provider: "mock" | "qwen" | "mock-fallback";
   keyConfigured: boolean;
   model: string;
+  reportModel?: string;
   lastRequestAt?: number;
   lastError?: string;
   calls?: Record<"coach" | "report" | "memory", AiCallStatus>;

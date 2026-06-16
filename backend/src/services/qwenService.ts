@@ -30,6 +30,12 @@ const MemorySummarySchema = z.object({
 
 const QWEN_TIMEOUT_MS = Number(process.env.QWEN_TIMEOUT_MS ?? 12000);
 
+interface StructuredResponseOptions {
+  model?: string;
+  maxTokens?: number;
+  temperature?: number;
+}
+
 function createClient() {
   const apiKey = process.env.QWEN_API_KEY;
   if (!apiKey) {
@@ -45,11 +51,12 @@ function createClient() {
 
 async function createStructuredResponse<T>(
   schema: z.ZodType<T>,
-  prompt: string
+  prompt: string,
+  options: StructuredResponseOptions = {}
 ): Promise<T> {
   const client = createClient();
   const response = await client.chat.completions.create({
-    model: process.env.QWEN_MODEL ?? "qwen-plus",
+    model: options.model ?? process.env.QWEN_MODEL ?? "qwen-plus",
     messages: [
       { role: "system", content: BOWLY_SYSTEM_PROMPT },
       {
@@ -60,6 +67,8 @@ Return only one valid JSON object. Do not include markdown or commentary.`,
       },
     ],
     response_format: { type: "json_object" },
+    max_tokens: options.maxTokens,
+    temperature: options.temperature,
   });
   const content = response.choices[0]?.message.content;
   if (!content) {
@@ -104,36 +113,38 @@ Persistent observations: ${JSON.stringify(payload.observations)}`
 export async function createQwenParentReport(
   payload: PracticeSessionRecord
 ): Promise<ParentReportResponse> {
+  const activity = payload.activity;
+  const reviewMoments = (payload.reviewMoments ?? []).slice(0, 2).map((moment) => ({
+    title: moment.title,
+    category: moment.category,
+    seconds: moment.totalDurationSeconds,
+    occurrences: moment.occurrences,
+    suggestion: moment.suggestion,
+  }));
+  const compactInput = {
+    childName: payload.childName,
+    durationSeconds: payload.durationSeconds,
+    practiceMode: payload.practiceMode ?? "legacy",
+    activityTitle: payload.challenge.title,
+    completed: payload.challenge.completed,
+    phraseCount: activity?.phraseCount ?? 0,
+    totalPlayingSeconds: activity?.totalPlayingSeconds ?? 0,
+    longestContinuousSeconds: activity?.longestContinuousSeconds ?? 0,
+    inTunePercent: activity?.pitchDataQuality === "good" ? activity.inTunePercent : null,
+    pitchDataQuality: activity?.pitchDataQuality ?? "insufficient",
+    reviewMoments,
+  };
   return createStructuredResponse(
     ParentReportSchema,
-    `Create a short parent report with these JSON fields:
-- summary: string
-- postureInsight: string
-- motivationLevel: one of low, medium, high
-- tomorrowSuggestion: string
-- memoryInsight: string
-
-Child: ${payload.childName}
-Duration seconds: ${payload.durationSeconds}
-Practice mode: ${payload.practiceMode ?? "legacy session"}
-Practice activity: ${payload.challenge.title}
-Pitch: ${payload.metrics.pitchStability}
-Measured activity: ${JSON.stringify(payload.activity ?? null)}
-Recorded review moments: ${JSON.stringify(
-      (payload.reviewMoments ?? []).slice(0, 3).map((moment) => ({
-        title: moment.title,
-        durationSeconds: moment.totalDurationSeconds,
-        occurrences: moment.occurrences,
-        suggestion: moment.suggestion,
-      }))
-    )}
-
-Use measured playing time, phrase count, longest continuous phrase, pitch
-percentages, completed rounds, and recorded camera-view observations as facts.
-Do not invent posture, motivation, emotional state, technique, or progress.
-Framing observations are camera setup notes, not posture problems. When
-evidence is unavailable, say that no reliable observation was recorded. Do not
-interpret pitch percentages when pitchDataQuality is insufficient or limited.`
+    `Return compact JSON for a parent violin practice report.
+Fields: summary, postureInsight, motivationLevel, tomorrowSuggestion, memoryInsight.
+Rules: use only input facts; no invented emotion/progress; framing means camera view only; keep each field one short sentence.
+Input: ${JSON.stringify(compactInput)}`,
+    {
+      model: process.env.QWEN_REPORT_MODEL ?? process.env.QWEN_MODEL ?? "qwen-plus",
+      maxTokens: Number(process.env.QWEN_REPORT_MAX_TOKENS ?? 320),
+      temperature: 0.2,
+    }
   );
 }
 
