@@ -6,7 +6,6 @@ import {
   CameraIcon,
   ChevronUpIcon,
   PlayIcon,
-  SparklesIcon,
   StopIcon,
   WrenchScrewdriverIcon,
   ViewfinderCircleIcon,
@@ -14,6 +13,7 @@ import {
 import CameraPanel from "../components/CameraPanel.vue";
 import PracticeCoachPanel from "../components/PracticeCoachPanel.vue";
 import AudioPitchMeter from "../components/AudioPitchMeter.vue";
+import PracticePet from "../components/PracticePet.vue";
 import SessionTimeline from "../components/SessionTimeline.vue";
 import PracticePlanCard from "../components/PracticePlanCard.vue";
 import PauseActions from "../components/PauseActions.vue";
@@ -672,6 +672,17 @@ function closeActiveObservations() {
             </div>
           </div>
 
+          <PracticePet
+            class="absolute bottom-[6.1rem] left-4 z-20 md:left-6"
+            :session-active="practiceStore.isSessionActive"
+            :is-playing="isPlaying"
+            :pitch-stability="pitchStability"
+            :note-name="noteName"
+            :camera-framing="cameraStatus.framing"
+            :start-issue="startIssue"
+            :micro-feedback="microFeedback"
+          />
+
           <div class="absolute bottom-4 left-1/2 z-20 hidden w-[min(94%,46rem)] -translate-x-1/2 md:block">
             <AudioPitchMeter
               :pitch-stability="pitchStability"
@@ -684,11 +695,11 @@ function closeActiveObservations() {
           </div>
 
           <div
-            v-if="microFeedback"
+            v-if="false"
             class="absolute inset-x-3 bottom-[5.75rem] z-30 overflow-hidden rounded-2xl border border-bowly-300/20 bg-stage-950/90 px-4 py-3 shadow-2xl backdrop-blur-xl md:hidden"
           >
             <div class="flex items-start gap-3">
-              <SparklesIcon class="mt-0.5 h-5 w-5 shrink-0 text-bowly-200" />
+              <span class="mt-1 h-2 w-2 shrink-0 rounded-full bg-bowly-200"></span>
               <div class="min-w-0">
                 <p class="text-[10px] font-semibold uppercase tracking-[0.12em] text-bowly-200/70">AI Coach · next phrase</p>
                 <p class="mt-1 text-sm font-medium leading-5 text-white/90">{{ microFeedback }}</p>
