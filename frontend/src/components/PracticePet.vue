@@ -156,15 +156,15 @@ const petState = computed(() => {
 <style scoped>
 .practice-pet {
   position: relative;
-  min-height: 6.35rem;
-  max-width: min(25.5rem, calc(100vw - 2rem));
+  min-height: 7.35rem;
+  max-width: min(28rem, calc(100vw - 2rem));
   border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 1.45rem;
   background:
     linear-gradient(135deg, rgba(255, 255, 255, 0.08), transparent 42%),
     radial-gradient(circle at 18% 20%, rgba(197, 173, 255, 0.22), transparent 30%),
     rgba(18, 16, 22, 0.82);
-  padding: 0.9rem 0.9rem 0.9rem 6.65rem;
+  padding: 1rem 1rem 1rem 9rem;
   color: white;
   box-shadow:
     0 18px 44px rgba(8, 6, 12, 0.38),
@@ -198,11 +198,11 @@ const petState = computed(() => {
 
 .practice-pet__glow {
   position: absolute;
-  left: 0.85rem;
-  top: 0.65rem;
-  z-index: -1;
-  width: 5.8rem;
-  height: 5.8rem;
+  left: 1.45rem;
+  top: 1.1rem;
+  z-index: 0;
+  width: 7.4rem;
+  height: 5.9rem;
   border-radius: 999px;
   background: rgba(139, 92, 246, 0.2);
   filter: blur(18px);
@@ -211,10 +211,10 @@ const petState = computed(() => {
 
 .practice-pet__shadow {
   position: absolute;
-  left: 1.05rem;
-  bottom: 0.45rem;
-  z-index: -1;
-  width: 5.5rem;
+  left: 1.35rem;
+  bottom: 0.28rem;
+  z-index: 0;
+  width: 7.6rem;
   height: 1.05rem;
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.38);
@@ -224,28 +224,22 @@ const petState = computed(() => {
 
 .practice-pet__avatar-wrap {
   position: absolute;
-  left: 0.55rem;
+  left: 0.05rem;
   top: 50%;
   display: grid;
-  width: 6.1rem;
-  height: 6.1rem;
+  width: 8.65rem;
+  height: 8.65rem;
   transform: translateY(-52%);
   place-items: center;
-  border-radius: 999px;
-  background:
-    radial-gradient(circle at 50% 45%, rgba(255, 255, 255, 0.16), transparent 44%),
-    rgba(255, 255, 255, 0.04);
-  box-shadow:
-    inset 0 -0.25rem 0 rgba(0, 0, 0, 0.1),
-    0 0 0 0.35rem rgba(255, 255, 255, 0.05);
-  overflow: hidden;
+  overflow: visible;
   animation: pet-float 3.2s ease-in-out infinite;
 }
 
 .practice-pet__avatar {
-  width: 128%;
-  height: 128%;
+  width: 122%;
+  height: 122%;
   object-fit: contain;
+  filter: drop-shadow(0 1rem 1.1rem rgba(0, 0, 0, 0.32));
   transition:
     transform 220ms ease,
     filter 220ms ease;
@@ -253,7 +247,7 @@ const petState = computed(() => {
 
 .practice-pet__avatar-wrap--happy .practice-pet__avatar {
   transform: translateY(-4px) scale(1.08);
-  filter: saturate(1.1) brightness(1.08);
+  filter: saturate(1.1) brightness(1.08) drop-shadow(0 1rem 1.1rem rgba(0, 0, 0, 0.32));
 }
 
 .practice-pet__avatar-wrap--focused .practice-pet__avatar {
@@ -262,11 +256,13 @@ const petState = computed(() => {
 
 .practice-pet__avatar-wrap--concerned .practice-pet__avatar {
   transform: rotate(-4deg) scale(1.05);
-  filter: saturate(0.9) brightness(0.96);
+  filter: saturate(0.9) brightness(0.96) drop-shadow(0 1rem 1.1rem rgba(0, 0, 0, 0.32));
 }
 
 .practice-pet__content {
   min-width: 0;
+  position: relative;
+  z-index: 1;
 }
 
 .practice-pet__heading {
@@ -376,14 +372,14 @@ const petState = computed(() => {
   .practice-pet {
     max-width: calc(100vw - 1.5rem);
     border-radius: 1rem;
-    min-height: 5.25rem;
-    padding: 0.7rem 0.75rem 0.7rem 5.4rem;
+    min-height: 5.9rem;
+    padding: 0.75rem 0.75rem 0.75rem 6.65rem;
   }
 
   .practice-pet__avatar-wrap {
-    left: 0.35rem;
-    width: 5rem;
-    height: 5rem;
+    left: -0.15rem;
+    width: 6.7rem;
+    height: 6.7rem;
   }
 
   .practice-pet__label {
@@ -399,15 +395,15 @@ const petState = computed(() => {
   }
 
   .practice-pet__glow {
-    left: 0.55rem;
+    left: 0.85rem;
     top: 0.5rem;
-    width: 4.6rem;
-    height: 4.6rem;
+    width: 5.35rem;
+    height: 4.8rem;
   }
 
   .practice-pet__shadow {
-    left: 0.75rem;
-    width: 4.5rem;
+    left: 0.95rem;
+    width: 5.8rem;
   }
 }
 </style>
