@@ -1,8 +1,17 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import puppyImage from "../assets/practice-pets/puppy.webp";
+import puppyListeningImage from "../assets/practice-pets/puppy-listening.webp";
+import puppySteadyImage from "../assets/practice-pets/puppy-steady.webp";
+import puppyClearerImage from "../assets/practice-pets/puppy-clearer.webp";
 import owlImage from "../assets/practice-pets/owl.webp";
+import owlListeningImage from "../assets/practice-pets/owl-listening.webp";
+import owlSteadyImage from "../assets/practice-pets/owl-steady.webp";
+import owlClearerImage from "../assets/practice-pets/owl-clearer.webp";
 import robotImage from "../assets/practice-pets/robot.webp";
+import robotListeningImage from "../assets/practice-pets/robot-listening.webp";
+import robotSteadyImage from "../assets/practice-pets/robot-steady.webp";
+import robotClearerImage from "../assets/practice-pets/robot-clearer.webp";
 
 const props = defineProps<{
   sessionActive: boolean;
@@ -16,31 +25,47 @@ const props = defineProps<{
 
 type PetId = "owl" | "puppy" | "robot";
 type PetTone = "ready" | "listening" | "playing" | "great" | "coach";
+type PetVisualState = "ready" | "listening" | "steady" | "clearer";
 
 const PET_STORAGE_KEY = "bowly-practice-pet";
 
 const pets: Array<{
   id: PetId;
   name: string;
-  image: string;
+  images: Record<PetVisualState, string>;
   hint: string;
 }> = [
   {
     id: "owl",
     name: "Owl",
-    image: owlImage,
+    images: {
+      ready: owlImage,
+      listening: owlListeningImage,
+      steady: owlSteadyImage,
+      clearer: owlClearerImage,
+    },
     hint: "Calm listener",
   },
   {
     id: "puppy",
     name: "Puppy",
-    image: puppyImage,
+    images: {
+      ready: puppyImage,
+      listening: puppyListeningImage,
+      steady: puppySteadyImage,
+      clearer: puppyClearerImage,
+    },
     hint: "Warm buddy",
   },
   {
     id: "robot",
     name: "Robot",
-    image: robotImage,
+    images: {
+      ready: robotImage,
+      listening: robotListeningImage,
+      steady: robotSteadyImage,
+      clearer: robotClearerImage,
+    },
     hint: "AI helper",
   },
 ];
@@ -70,6 +95,7 @@ const petState = computed(() => {
       face: "concerned",
       symbol: "!",
       showMessage: true,
+      visual: "clearer",
     };
   }
 
@@ -81,6 +107,7 @@ const petState = computed(() => {
       face: "calm",
       symbol: "✓",
       showMessage: false,
+      visual: "ready",
     };
   }
 
@@ -92,6 +119,7 @@ const petState = computed(() => {
       face: "focused",
       symbol: "•",
       showMessage: true,
+      visual: "clearer",
     };
   }
 
@@ -103,6 +131,7 @@ const petState = computed(() => {
       face: "happy",
       symbol: "♪",
       showMessage: false,
+      visual: "steady",
     };
   }
 
@@ -114,6 +143,7 @@ const petState = computed(() => {
       face: "focused",
       symbol: "♪",
       showMessage: false,
+      visual: "listening",
     };
   }
 
@@ -124,10 +154,14 @@ const petState = computed(() => {
     face: "calm",
     symbol: "•",
     showMessage: false,
+    visual: "listening",
   };
 });
 
 const petToneClass = computed(() => `practice-pet--${petState.value.tone as PetTone}`);
+const selectedPetImage = computed(
+  () => selectedPet.value.images[petState.value.visual as PetVisualState],
+);
 </script>
 
 <template>
@@ -141,7 +175,7 @@ const petToneClass = computed(() => `practice-pet--${petState.value.tone as PetT
     <div class="practice-pet__avatar-wrap" :class="`practice-pet__avatar-wrap--${petState.face}`">
       <img
         class="practice-pet__avatar"
-        :src="selectedPet.image"
+        :src="selectedPetImage"
         :alt="`${selectedPet.name} practice buddy`"
       />
     </div>
@@ -164,7 +198,7 @@ const petToneClass = computed(() => `practice-pet--${petState.value.tone as PetT
         :aria-pressed="selectedPetId === pet.id"
         @click="selectedPetId = pet.id"
       >
-        <img :src="pet.image" alt="" />
+        <img :src="pet.images.ready" alt="" />
       </button>
     </div>
   </section>
