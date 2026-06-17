@@ -1,5 +1,8 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref, watch } from "vue";
+import puppyImage from "../assets/practice-pets/puppy.webp";
+import owlImage from "../assets/practice-pets/owl.webp";
+import robotImage from "../assets/practice-pets/robot.webp";
 
 const props = defineProps<{
   sessionActive: boolean;
@@ -10,6 +13,52 @@ const props = defineProps<{
   startIssue: string;
   microFeedback: string;
 }>();
+
+type PetId = "owl" | "puppy" | "robot";
+
+const PET_STORAGE_KEY = "bowly-practice-pet";
+
+const pets: Array<{
+  id: PetId;
+  name: string;
+  image: string;
+  hint: string;
+}> = [
+  {
+    id: "owl",
+    name: "Owl",
+    image: owlImage,
+    hint: "Calm listener",
+  },
+  {
+    id: "puppy",
+    name: "Puppy",
+    image: puppyImage,
+    hint: "Warm buddy",
+  },
+  {
+    id: "robot",
+    name: "Robot",
+    image: robotImage,
+    hint: "AI helper",
+  },
+];
+
+const savedPet =
+  typeof window === "undefined"
+    ? ""
+    : window.localStorage.getItem(PET_STORAGE_KEY);
+const selectedPetId = ref<PetId>(
+  pets.some((pet) => pet.id === savedPet) ? (savedPet as PetId) : "owl",
+);
+
+const selectedPet = computed(
+  () => pets.find((pet) => pet.id === selectedPetId.value) ?? pets[0],
+);
+
+watch(selectedPetId, (next) => {
+  window.localStorage.setItem(PET_STORAGE_KEY, next);
+});
 
 const petState = computed(() => {
   if (props.startIssue || props.cameraFraming === "adjust") {
@@ -72,17 +121,31 @@ const petState = computed(() => {
     :class="`practice-pet--${petState.tone}`"
     aria-live="polite"
   >
-    <div class="practice-pet__avatar" :class="`practice-pet__avatar--${petState.face}`">
-      <span class="practice-pet__ear practice-pet__ear--left"></span>
-      <span class="practice-pet__ear practice-pet__ear--right"></span>
-      <span class="practice-pet__face">
-        <span class="practice-pet__eye practice-pet__eye--left"></span>
-        <span class="practice-pet__eye practice-pet__eye--right"></span>
-        <span class="practice-pet__mouth"></span>
-      </span>
+    <div class="practice-pet__avatar-wrap" :class="`practice-pet__avatar-wrap--${petState.face}`">
+      <img
+        class="practice-pet__avatar"
+        :src="selectedPet.image"
+        :alt="`${selectedPet.name} practice buddy`"
+      />
     </div>
     <div class="min-w-0">
-      <p class="practice-pet__label">{{ petState.label }}</p>
+      <div class="practice-pet__heading">
+        <p class="practice-pet__label">{{ petState.label }}</p>
+        <div class="practice-pet__chooser" aria-label="Choose practice buddy">
+          <button
+            v-for="pet in pets"
+            :key="pet.id"
+            type="button"
+            class="practice-pet__choice"
+            :class="{ 'practice-pet__choice--active': selectedPetId === pet.id }"
+            :aria-label="`Choose ${pet.name}, ${pet.hint}`"
+            :aria-pressed="selectedPetId === pet.id"
+            @click="selectedPetId = pet.id"
+          >
+            <img :src="pet.image" alt="" />
+          </button>
+        </div>
+      </div>
       <p class="practice-pet__message">{{ petState.message }}</p>
     </div>
   </section>
@@ -119,89 +182,51 @@ const petState = computed(() => {
   border-color: rgba(197, 173, 255, 0.28);
 }
 
-.practice-pet__avatar {
+.practice-pet__avatar-wrap {
   position: relative;
   display: grid;
-  width: 3rem;
-  height: 3rem;
+  width: 3.65rem;
+  height: 3.65rem;
   flex: 0 0 auto;
   place-items: center;
   border-radius: 999px;
-  background:
-    radial-gradient(circle at 35% 25%, rgba(255, 255, 255, 0.8), transparent 18%),
-    linear-gradient(145deg, #f6d7a7, #c89054);
+  background: radial-gradient(circle at 50% 35%, rgba(255, 255, 255, 0.12), rgba(139, 92, 246, 0.1));
   box-shadow:
-    inset 0 -0.35rem 0 rgba(74, 46, 25, 0.16),
-    0 0 0 0.35rem rgba(255, 255, 255, 0.06);
+    inset 0 -0.2rem 0 rgba(255, 255, 255, 0.05),
+    0 0 0 0.35rem rgba(255, 255, 255, 0.05),
+    0 0 24px rgba(139, 92, 246, 0.22);
+  overflow: hidden;
 }
 
-.practice-pet__ear {
-  position: absolute;
-  top: -0.28rem;
-  width: 1.05rem;
-  height: 1.05rem;
-  border-radius: 0.35rem 0.8rem 0.35rem 0.8rem;
-  background: #c89054;
+.practice-pet__avatar {
+  width: 116%;
+  height: 116%;
+  object-fit: cover;
+  transition:
+    transform 220ms ease,
+    filter 220ms ease;
 }
 
-.practice-pet__ear--left {
-  left: 0.28rem;
-  transform: rotate(-24deg);
+.practice-pet__avatar-wrap--happy .practice-pet__avatar {
+  transform: translateY(-2px) scale(1.06);
+  filter: saturate(1.1) brightness(1.08);
 }
 
-.practice-pet__ear--right {
-  right: 0.28rem;
-  transform: scaleX(-1) rotate(-24deg);
+.practice-pet__avatar-wrap--focused .practice-pet__avatar {
+  transform: scale(1.04);
 }
 
-.practice-pet__face {
-  position: relative;
-  width: 2.05rem;
-  height: 1.65rem;
+.practice-pet__avatar-wrap--concerned .practice-pet__avatar {
+  transform: rotate(-3deg) scale(1.03);
+  filter: saturate(0.9) brightness(0.96);
 }
 
-.practice-pet__eye {
-  position: absolute;
-  top: 0.38rem;
-  width: 0.32rem;
-  height: 0.38rem;
-  border-radius: 999px;
-  background: #211824;
-  transition: transform 180ms ease;
-}
-
-.practice-pet__eye--left {
-  left: 0.45rem;
-}
-
-.practice-pet__eye--right {
-  right: 0.45rem;
-}
-
-.practice-pet__mouth {
-  position: absolute;
-  left: 50%;
-  bottom: 0.18rem;
-  width: 0.7rem;
-  height: 0.34rem;
-  transform: translateX(-50%);
-  border-bottom: 2px solid #211824;
-  border-radius: 0 0 999px 999px;
-}
-
-.practice-pet__avatar--concerned .practice-pet__mouth {
-  bottom: 0.05rem;
-  transform: translateX(-50%) rotate(180deg);
-}
-
-.practice-pet__avatar--focused .practice-pet__eye {
-  transform: scaleY(0.72);
-}
-
-.practice-pet__avatar--happy .practice-pet__mouth {
-  width: 0.9rem;
-  height: 0.45rem;
-  border-bottom-width: 3px;
+.practice-pet__heading {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
 }
 
 .practice-pet__label {
@@ -211,6 +236,42 @@ const petState = computed(() => {
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: rgba(221, 208, 255, 0.9);
+}
+
+.practice-pet__chooser {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 0.24rem;
+}
+
+.practice-pet__choice {
+  display: grid;
+  width: 1.35rem;
+  height: 1.35rem;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 0;
+  opacity: 0.72;
+  transition:
+    border-color 160ms ease,
+    opacity 160ms ease,
+    transform 160ms ease;
+}
+
+.practice-pet__choice:hover,
+.practice-pet__choice--active {
+  border-color: rgba(221, 208, 255, 0.72);
+  opacity: 1;
+  transform: translateY(-1px);
+}
+
+.practice-pet__choice img {
+  width: 135%;
+  height: 135%;
+  object-fit: cover;
 }
 
 .practice-pet__message {
@@ -232,13 +293,17 @@ const petState = computed(() => {
     padding: 0.55rem 0.65rem;
   }
 
-  .practice-pet__avatar {
-    width: 2.45rem;
-    height: 2.45rem;
+  .practice-pet__avatar-wrap {
+    width: 3rem;
+    height: 3rem;
   }
 
   .practice-pet__message {
     font-size: 0.78rem;
+  }
+
+  .practice-pet__chooser {
+    display: none;
   }
 }
 </style>
