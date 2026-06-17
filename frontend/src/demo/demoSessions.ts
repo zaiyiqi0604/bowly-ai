@@ -3,30 +3,41 @@ import type {
   PracticeSessionRecord,
 } from "../types/session";
 
-function createSnapshot(capturedAt: number, yOffset = 0): AnonymousPoseSnapshot {
+function createSnapshot(
+  capturedAt: number,
+  variant: "before" | "after" = "before"
+): AnonymousPoseSnapshot {
+  const improved = variant === "after";
   return {
     capturedAt,
     points: [
-      { id: 5, x: 0.42, y: 0.34 + yOffset, confidence: 0.95 },
-      { id: 6, x: 0.58, y: 0.34 + yOffset, confidence: 0.94 },
-      { id: 7, x: 0.38, y: 0.48 + yOffset, confidence: 0.9 },
-      { id: 8, x: 0.63, y: 0.48 + yOffset, confidence: 0.89 },
-      { id: 9, x: 0.31, y: 0.62 + yOffset, confidence: 0.88 },
-      { id: 10, x: 0.69, y: 0.62 + yOffset, confidence: 0.87 },
+      { id: 5, x: 0.42, y: 0.34, confidence: 0.95 },
+      { id: 6, x: 0.58, y: 0.34, confidence: 0.94 },
+      { id: 7, x: improved ? 0.39 : 0.38, y: improved ? 0.49 : 0.48, confidence: 0.9 },
+      { id: 8, x: improved ? 0.61 : 0.63, y: improved ? 0.49 : 0.48, confidence: 0.89 },
+      { id: 9, x: improved ? 0.34 : 0.31, y: improved ? 0.59 : 0.62, confidence: 0.88 },
+      { id: 10, x: improved ? 0.65 : 0.69, y: improved ? 0.56 : 0.62, confidence: 0.87 },
     ],
     violin: {
       startX: 0.38,
-      startY: 0.38 + yOffset,
+      startY: 0.38,
       endX: 0.62,
-      endY: 0.4 + yOffset,
+      endY: 0.4,
       confidence: 0.75,
     },
     bow: {
-      startX: 0.28,
-      startY: 0.62 + yOffset,
-      endX: 0.72,
-      endY: 0.42 + yOffset,
-      confidence: 0.8,
+      startX: improved ? 0.31 : 0.28,
+      startY: improved ? 0.58 : 0.62,
+      endX: improved ? 0.7 : 0.72,
+      endY: improved ? 0.43 : 0.42,
+      confidence: improved ? 0.84 : 0.8,
+    },
+    evidence: {
+      label: improved ? "later local pose sample" : "edge evidence sample",
+      quality: "usable",
+      approximateAngleDegrees: improved ? 12 : 24,
+      referenceAngleDegrees: 10,
+      note: improved ? "closer to target" : "wrist stayed high",
     },
   };
 }
@@ -48,8 +59,8 @@ export function createDemoSessions(now = Date.now()): PracticeSessionRecord[] {
       (sum, value) => sum + value,
       0
     );
-    const before = createSnapshot(endedAt - 45000);
-    const after = createSnapshot(endedAt - 9000, -0.02);
+    const before = createSnapshot(endedAt - 45000, "before");
+    const after = createSnapshot(endedAt - 9000, "after");
 
     return {
       id: `bowly-demo-${index + 1}`,
@@ -111,7 +122,7 @@ export function createDemoSessions(now = Date.now()): PracticeSessionRecord[] {
             {
               id: "bowly-demo-review-1",
               key: "soft-wrist",
-              title: "Bow wrist tension",
+              title: "Bow wrist pattern",
               suggestion: "Try the next phrase with a softer bow wrist.",
               firstSeenAt: endedAt - 60000,
               lastSeenAt: endedAt - 8000,

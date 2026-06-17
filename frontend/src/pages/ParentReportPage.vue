@@ -899,7 +899,7 @@ onMounted(async () => {
                     class="mb-2 text-xs font-semibold uppercase tracking-[0.16em]"
                     :class="moment.category === 'posture' ? 'text-bowly-600' : 'text-stone-500'"
                   >
-                    {{ moment.category === "posture" ? "Playing position note" : "Camera view note" }}
+                    {{ moment.category === "posture" ? "Local movement signal" : "Camera view note" }}
                   </p>
                   <h3 class="text-lg font-semibold text-stage-950">{{ moment.title }}</h3>
                   <p class="mt-1 text-sm text-stone-500">
@@ -924,7 +924,7 @@ onMounted(async () => {
                 <p class="mt-2 text-sm leading-6 text-stone-600">
                   {{
                     moment.category === "posture"
-                      ? `Bowly saw this pattern continue for about ${moment.totalDurationSeconds} seconds.`
+                      ? `Bowly found this local pose pattern in usable samples for about ${moment.totalDurationSeconds} seconds.`
                       : "The camera could not clearly see part of the playing position, so Bowly did not use it to judge the child's movement."
                   }}
                 </p>
@@ -940,14 +940,14 @@ onMounted(async () => {
               <div class="mt-5 grid gap-4 md:grid-cols-2">
                 <div>
                   <p class="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-bowly-600">
-                    What Bowly checked
+                    Edge evidence sample
                   </p>
                   <PoseSnapshot :snapshot="moment.before" tone="before" />
                 </div>
                 <div>
                   <p class="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-lime-700">
                     <CheckCircleIcon class="h-4 w-4" />
-                    {{ moment.after ? "Movement improved later" : "Setup for next time" }}
+                    {{ moment.after ? "Later sample closer to target" : "Setup for next time" }}
                   </p>
                   <PoseSnapshot
                     v-if="moment.after"

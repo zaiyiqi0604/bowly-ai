@@ -108,6 +108,7 @@ let poseDetector: PoseDetector | null = null;
 let targetPose: Keypoint[] | null = null;
 let renderedPose: Keypoint[] | null = null;
 let stablePose: Keypoint[] | null = null;
+let bowPathTrail: Array<{ x: number; y: number; confidence: number }> = [];
 let pendingCueKey = "";
 let pendingCueSince = 0;
 let activeCueKey = "";
@@ -198,6 +199,15 @@ function clamp(value: number, min: number, max: number) {
 }
 
 function createAnonymousSnapshot(landmarks: Keypoint[]): AnonymousPoseSnapshot {
+  const elbow = landmarks[8] ?? landmarks[7];
+  const wrist = landmarks[10] ?? landmarks[9];
+  const approximateAngleDegrees =
+    elbow &&
+    wrist &&
+    (elbow.score ?? 0) >= MIN_KEYPOINT_SCORE &&
+    (wrist.score ?? 0) >= MIN_KEYPOINT_SCORE
+      ? Math.round(Math.abs(Math.atan2(wrist.y - elbow.y, wrist.x - elbow.x) * (180 / Math.PI)))
+      : undefined;
   return {
     capturedAt: Date.now(),
     points: [5, 6, 7, 8, 9, 10].flatMap((id) => {
@@ -210,7 +220,47 @@ function createAnonymousSnapshot(landmarks: Keypoint[]): AnonymousPoseSnapshot {
         confidence: clamp(point.score ?? 0, 0, 1),
       }];
     }),
+    evidence: {
+      label: "live local pose sample",
+      quality: approximateAngleDegrees == null ? "limited" : "usable",
+      approximateAngleDegrees,
+      note: approximateAngleDegrees == null ? "partial view" : "movement signal",
+    },
   };
+}
+
+function drawLiveLabel(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  tone: "lime" | "amber" | "purple" = "lime"
+) {
+  const color =
+    tone === "amber"
+      ? "rgba(252, 211, 77, 0.9)"
+      : tone === "purple"
+        ? "rgba(196, 181, 253, 0.9)"
+        : "rgba(190, 242, 100, 0.9)";
+  ctx.save();
+  ctx.font = "600 11px Avenir Next, Segoe UI, sans-serif";
+  ctx.textBaseline = "middle";
+  const metrics = ctx.measureText(text);
+  const width = metrics.width + 14;
+  ctx.fillStyle = "rgba(18, 16, 22, 0.68)";
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.12)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.roundRect(x, y - 11, width, 22, 11);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = color;
+  ctx.fillText(text, x + 7, y);
+  ctx.restore();
+}
+
+function angleBetween(a: { x: number; y: number }, b: { x: number; y: number }) {
+  return Math.atan2(b.y - a.y, b.x - a.x);
 }
 
 function drawPose(landmarks: Keypoint[]) {
@@ -238,6 +288,75 @@ function drawPose(landmarks: Keypoint[]) {
     x: offsetX + (landmark.x / PROCESSING_WIDTH) * renderedWidth,
     y: offsetY + (landmark.y / PROCESSING_HEIGHT) * renderedHeight,
   });
+  const pointMap = new Map<number, { x: number; y: number; score: number }>();
+  [5, 6, 7, 8, 9, 10].forEach((index) => {
+    const landmark = landmarks[index];
+    if (!landmark || (landmark.score ?? 0) < MIN_KEYPOINT_SCORE) return;
+    const point = pointAt(landmark);
+    pointMap.set(index, { ...point, score: landmark.score ?? 0 });
+  });
+
+  const liveConnections = [
+    [5, 6],
+    [5, 7],
+    [7, 9],
+    [6, 8],
+    [8, 10],
+  ] as const;
+  for (const [startId, endId] of liveConnections) {
+    const start = pointMap.get(startId);
+    const end = pointMap.get(endId);
+    if (!start || !end) continue;
+    const confidence = clamp(Math.min(start.score, end.score), 0.25, 1);
+    ctx.beginPath();
+    ctx.moveTo(start.x, start.y);
+    ctx.lineTo(end.x, end.y);
+    ctx.lineWidth = 2 + confidence * 2;
+    ctx.strokeStyle = currentFramingIssue
+      ? `rgba(252, 211, 77, ${0.25 + confidence * 0.45})`
+      : `rgba(190, 242, 100, ${0.25 + confidence * 0.5})`;
+    ctx.stroke();
+  }
+
+  const leftWrist = pointMap.get(9);
+  const rightWrist = pointMap.get(10);
+  if (leftWrist && rightWrist) {
+    const midpoint = {
+      x: (leftWrist.x + rightWrist.x) / 2,
+      y: (leftWrist.y + rightWrist.y) / 2,
+      confidence: Math.min(leftWrist.score, rightWrist.score),
+    };
+    bowPathTrail = [...bowPathTrail.slice(-17), midpoint];
+    if (bowPathTrail.length > 1) {
+      ctx.beginPath();
+      bowPathTrail.forEach((point, index) => {
+        if (index === 0) ctx.moveTo(point.x, point.y);
+        else ctx.lineTo(point.x, point.y);
+      });
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = "rgba(249, 115, 22, 0.58)";
+      ctx.stroke();
+      drawLiveLabel(ctx, "bow path signal", midpoint.x + 12, midpoint.y - 18, "amber");
+    }
+  } else {
+    bowPathTrail = bowPathTrail.slice(-8);
+  }
+
+  const bowArmElbow = pointMap.get(8) ?? pointMap.get(7);
+  const bowArmWrist = pointMap.get(10) ?? pointMap.get(9);
+  if (bowArmElbow && bowArmWrist) {
+    const wristAngle = Math.round(
+      Math.abs(angleBetween(bowArmElbow, bowArmWrist) * (180 / Math.PI))
+    );
+    ctx.beginPath();
+    ctx.arc(bowArmWrist.x, bowArmWrist.y, 24, -0.35 * Math.PI, 0.2 * Math.PI);
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = currentFramingIssue
+      ? "rgba(252, 211, 77, 0.75)"
+      : "rgba(196, 181, 253, 0.75)";
+    ctx.stroke();
+    drawLiveLabel(ctx, `wrist angle ~${wristAngle}deg`, bowArmWrist.x + 12, bowArmWrist.y + 28, "purple");
+  }
 
   [7, 8, 9, 10].forEach((index) => {
     const landmark = landmarks[index];
@@ -258,6 +377,10 @@ function drawPose(landmarks: Keypoint[]) {
       : "rgba(190, 242, 100, 0.78)";
     ctx.stroke();
   });
+  const shoulder = pointMap.get(5) ?? pointMap.get(6);
+  if (shoulder) {
+    drawLiveLabel(ctx, "local pose signals", shoulder.x + 14, shoulder.y - 28);
+  }
   ctx.restore();
 }
 
@@ -534,6 +657,7 @@ function stopRenderLoop() {
   targetPose = null;
   renderedPose = null;
   stablePose = null;
+  bowPathTrail = [];
   currentFramingIssue = null;
   visibilityStatus.value = "Waiting for a clear body view";
   pendingCueKey = "";
@@ -625,7 +749,7 @@ async function runTracking() {
       targetPose = stabilizePose(landmarks);
       updateTrackingGuidance(targetPose);
       updatePracticeCue(targetPose);
-      trackingStatus.value = "Tracking your posture in real time.";
+      trackingStatus.value = "Tracking local movement signals in real time.";
     } else {
       targetPose = null;
       framingTone.value = "searching";

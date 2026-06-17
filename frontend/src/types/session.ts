@@ -58,6 +58,13 @@ export interface AnonymousPoseSnapshot {
   points: PoseSnapshotPoint[];
   bow?: PoseSnapshotLine;
   violin?: PoseSnapshotLine;
+  evidence?: {
+    label?: string;
+    quality?: "limited" | "usable" | "strong";
+    approximateAngleDegrees?: number;
+    referenceAngleDegrees?: number;
+    note?: string;
+  };
 }
 
 export interface PracticeReviewMoment {
