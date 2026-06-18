@@ -18,6 +18,8 @@ const props = defineProps<{
   isPlaying: boolean;
   pitchStability: number;
   durationSeconds: number;
+  playingSeconds: number;
+  stablePlayingSeconds: number;
   noteName: string;
   cameraFraming: "good" | "adjust" | "searching";
   startIssue: string;
@@ -105,12 +107,17 @@ watch(selectedPetId, (next) => {
 });
 
 watch(
-  () => [selectedPetId.value, props.sessionActive, props.durationSeconds, props.pitchStability],
+  () => [
+    selectedPetId.value,
+    props.sessionActive,
+    props.playingSeconds,
+    props.stablePlayingSeconds,
+  ],
   () => {
     const readyToWake =
       props.sessionActive &&
-      props.durationSeconds >= 30 &&
-      (props.pitchStability >= 55 || props.isPlaying);
+      props.playingSeconds >= 30 &&
+      (props.stablePlayingSeconds >= 6 || props.pitchStability >= 55);
     if (!readyToWake || selectedPetAwake.value) return;
 
     awakenedPets.value = {
@@ -124,9 +131,9 @@ watch(
 );
 
 const missionStage = computed<PetMissionStage>(() => {
-  if (!selectedPetAwake.value && props.durationSeconds < 30) return "egg";
-  if (props.sessionActive && props.durationSeconds >= 45 && props.pitchStability >= 70) return "calm";
-  if (props.isPlaying || props.sessionActive) return "listening";
+  if (!selectedPetAwake.value && props.playingSeconds < 8) return "egg";
+  if (props.sessionActive && props.stablePlayingSeconds >= 15) return "calm";
+  if (props.isPlaying || props.sessionActive || props.playingSeconds >= 8) return "listening";
   return selectedPetAwake.value ? "calm" : "egg";
 });
 
@@ -211,8 +218,10 @@ const habitatStateClass = computed(() => `practice-pet--${petState.value.visual 
 const missionStageClass = computed(() => `practice-pet--mission-${missionStage.value}`);
 const missionProgress = computed(() => {
   if (missionStage.value === "calm") return 100;
-  if (missionStage.value === "listening") return Math.min(96, Math.max(42, props.durationSeconds * 2));
-  return Math.min(34, Math.max(12, props.durationSeconds));
+  if (missionStage.value === "listening") {
+    return Math.min(96, Math.max(42, 42 + props.stablePlayingSeconds * 3.6));
+  }
+  return Math.min(34, Math.max(12, 12 + props.playingSeconds * 2.6));
 });
 </script>
 

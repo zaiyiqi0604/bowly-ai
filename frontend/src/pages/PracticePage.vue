@@ -678,6 +678,8 @@ function closeActiveObservations() {
             :is-playing="isPlaying"
             :pitch-stability="pitchStability"
             :duration-seconds="durationSeconds"
+            :playing-seconds="activity.totalPlayingSeconds"
+            :stable-playing-seconds="activity.stablePitchSeconds"
             :note-name="noteName"
             :camera-framing="cameraStatus.framing"
             :start-issue="startIssue"
