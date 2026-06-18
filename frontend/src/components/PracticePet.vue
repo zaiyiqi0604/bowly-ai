@@ -382,7 +382,8 @@ const missionProgress = computed(() => {
 .practice-pet__mission-orb {
   position: absolute;
   left: 2.55rem;
-  bottom: 1.2rem;
+  bottom: 1.45rem;
+  z-index: 2;
   width: 4.25rem;
   height: 4.65rem;
   border: 1px solid rgba(255, 255, 255, 0.16);
@@ -430,10 +431,46 @@ const missionProgress = computed(() => {
   animation: mission-egg 2.8s ease-in-out infinite;
 }
 
+.practice-pet--mission-egg .practice-pet__habitat {
+  opacity: 1;
+  transform: translateY(-0.08rem) scale(1.02);
+}
+
+.practice-pet--mission-egg .practice-pet__habitat-back {
+  height: 3.25rem;
+  border-radius: 45% 45% 1.35rem 1.35rem;
+  background:
+    radial-gradient(ellipse at 50% 0%, color-mix(in srgb, currentColor 34%, transparent), transparent 58%),
+    linear-gradient(135deg, rgba(75, 59, 106, 0.9), rgba(28, 24, 36, 0.76));
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.16),
+    0 1rem 2rem rgba(0, 0, 0, 0.28),
+    0 0 2rem color-mix(in srgb, currentColor 18%, transparent);
+}
+
+.practice-pet--mission-egg .practice-pet__habitat-mark--one {
+  left: 1.45rem;
+  top: 4.05rem;
+  width: 2.3rem;
+  height: 0.32rem;
+  opacity: 0.7;
+  transform: rotate(-9deg);
+}
+
+.practice-pet--mission-egg .practice-pet__habitat-mark--two {
+  right: 2.1rem;
+  top: 4.2rem;
+  width: 1.95rem;
+  height: 0.3rem;
+  border: 0;
+  opacity: 0.62;
+  transform: rotate(11deg);
+}
+
 .practice-pet--mission-egg .practice-pet__avatar {
-  opacity: 0.88;
-  transform: translateY(-0.2rem) scale(0.96);
-  filter: saturate(0.88) brightness(0.92) drop-shadow(0 1rem 1.1rem rgba(0, 0, 0, 0.32));
+  opacity: 0.08;
+  transform: translateY(0.2rem) scale(0.82);
+  filter: blur(1px) saturate(0.65) brightness(0.78) drop-shadow(0 1rem 1.1rem rgba(0, 0, 0, 0.32));
 }
 
 .practice-pet--mission-egg .practice-pet__habitat-meter {
