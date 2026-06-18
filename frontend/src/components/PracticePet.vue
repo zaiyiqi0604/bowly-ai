@@ -17,6 +17,7 @@ const props = defineProps<{
   sessionActive: boolean;
   isPlaying: boolean;
   pitchStability: number;
+  durationSeconds: number;
   noteName: string;
   cameraFraming: "good" | "adjust" | "searching";
   startIssue: string;
@@ -26,8 +27,10 @@ const props = defineProps<{
 type PetId = "owl" | "puppy" | "robot";
 type PetTone = "ready" | "listening" | "playing" | "great" | "coach";
 type PetVisualState = "ready" | "listening" | "steady" | "clearer";
+type PetMissionStage = "egg" | "listening" | "calm";
 
 const PET_STORAGE_KEY = "bowly-practice-pet";
+const PET_MISSION_STORAGE_KEY = "bowly-practice-pet-mission";
 
 const pets: Array<{
   id: PetId;
@@ -82,8 +85,49 @@ const selectedPet = computed(
   () => pets.find((pet) => pet.id === selectedPetId.value) ?? pets[0],
 );
 
+function readPetMission() {
+  if (typeof window === "undefined") return {} as Record<PetId, boolean>;
+  try {
+    return JSON.parse(window.localStorage.getItem(PET_MISSION_STORAGE_KEY) ?? "{}") as Record<
+      PetId,
+      boolean
+    >;
+  } catch {
+    return {} as Record<PetId, boolean>;
+  }
+}
+
+const awakenedPets = ref<Record<PetId, boolean>>(readPetMission());
+const selectedPetAwake = computed(() => awakenedPets.value[selectedPetId.value] === true);
+
 watch(selectedPetId, (next) => {
   if (typeof window !== "undefined") window.localStorage.setItem(PET_STORAGE_KEY, next);
+});
+
+watch(
+  () => [selectedPetId.value, props.sessionActive, props.durationSeconds, props.pitchStability],
+  () => {
+    const readyToWake =
+      props.sessionActive &&
+      props.durationSeconds >= 30 &&
+      (props.pitchStability >= 55 || props.isPlaying);
+    if (!readyToWake || selectedPetAwake.value) return;
+
+    awakenedPets.value = {
+      ...awakenedPets.value,
+      [selectedPetId.value]: true,
+    };
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(PET_MISSION_STORAGE_KEY, JSON.stringify(awakenedPets.value));
+    }
+  },
+);
+
+const missionStage = computed<PetMissionStage>(() => {
+  if (!selectedPetAwake.value && props.durationSeconds < 30) return "egg";
+  if (props.sessionActive && props.durationSeconds >= 45 && props.pitchStability >= 70) return "calm";
+  if (props.isPlaying || props.sessionActive) return "listening";
+  return selectedPetAwake.value ? "calm" : "egg";
 });
 
 const petState = computed(() => {
@@ -164,16 +208,23 @@ const selectedPetImage = computed(
 );
 const habitatClass = computed(() => `practice-pet--${selectedPet.value.id}`);
 const habitatStateClass = computed(() => `practice-pet--${petState.value.visual as PetVisualState}`);
+const missionStageClass = computed(() => `practice-pet--mission-${missionStage.value}`);
+const missionProgress = computed(() => {
+  if (missionStage.value === "calm") return 100;
+  if (missionStage.value === "listening") return Math.min(96, Math.max(42, props.durationSeconds * 2));
+  return Math.min(34, Math.max(12, props.durationSeconds));
+});
 </script>
 
 <template>
   <section
     class="practice-pet"
-    :class="[petToneClass, habitatClass, habitatStateClass]"
+    :class="[petToneClass, habitatClass, habitatStateClass, missionStageClass]"
     aria-live="polite"
   >
     <div class="practice-pet__habitat" aria-hidden="true">
       <span class="practice-pet__habitat-back"></span>
+      <span class="practice-pet__mission-orb"></span>
       <span class="practice-pet__habitat-mark practice-pet__habitat-mark--one"></span>
       <span class="practice-pet__habitat-mark practice-pet__habitat-mark--two"></span>
       <span class="practice-pet__habitat-meter">
@@ -181,6 +232,7 @@ const habitatStateClass = computed(() => `practice-pet--${petState.value.visual 
         <span></span>
         <span></span>
       </span>
+      <span class="practice-pet__mission-ring" :style="{ '--pet-progress': `${missionProgress}%` }"></span>
     </div>
     <span class="practice-pet__glow"></span>
     <span class="practice-pet__shadow"></span>
@@ -316,6 +368,82 @@ const habitatStateClass = computed(() => `practice-pet--${petState.value.visual 
 .practice-pet__habitat-meter span:nth-child(3) {
   height: 0.64rem;
   animation-delay: 240ms;
+}
+
+.practice-pet__mission-orb {
+  position: absolute;
+  left: 2.55rem;
+  bottom: 1.2rem;
+  width: 4.25rem;
+  height: 4.65rem;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 52% 52% 46% 46%;
+  background:
+    radial-gradient(circle at 38% 26%, rgba(255, 255, 255, 0.32), transparent 18%),
+    radial-gradient(circle at 50% 70%, color-mix(in srgb, currentColor 34%, transparent), transparent 62%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.02));
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.22),
+    0 0 1.9rem color-mix(in srgb, currentColor 28%, transparent);
+  opacity: 0;
+  transform: translateY(0.25rem) scale(0.82);
+  transition:
+    opacity 220ms ease,
+    transform 240ms ease;
+}
+
+.practice-pet__mission-ring {
+  position: absolute;
+  left: 0.85rem;
+  bottom: 0.72rem;
+  width: 7.9rem;
+  height: 0.34rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  opacity: 0.72;
+}
+
+.practice-pet__mission-ring::before {
+  position: absolute;
+  inset: 0;
+  width: var(--pet-progress);
+  border-radius: inherit;
+  background: linear-gradient(90deg, currentColor, rgba(190, 242, 100, 0.95));
+  box-shadow: 0 0 1rem color-mix(in srgb, currentColor 42%, transparent);
+  content: "";
+  transition: width 260ms ease;
+}
+
+.practice-pet--mission-egg .practice-pet__mission-orb {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  animation: mission-egg 2.8s ease-in-out infinite;
+}
+
+.practice-pet--mission-egg .practice-pet__avatar {
+  opacity: 0.88;
+  transform: translateY(-0.2rem) scale(0.96);
+  filter: saturate(0.88) brightness(0.92) drop-shadow(0 1rem 1.1rem rgba(0, 0, 0, 0.32));
+}
+
+.practice-pet--mission-egg .practice-pet__habitat-meter {
+  opacity: 0.28;
+}
+
+.practice-pet--mission-listening .practice-pet__habitat-meter {
+  opacity: 0.86;
+}
+
+.practice-pet--mission-calm .practice-pet__mission-ring {
+  opacity: 1;
+}
+
+.practice-pet--mission-calm .practice-pet__habitat-back {
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.14),
+    0 1.15rem 2rem rgba(0, 0, 0, 0.2),
+    0 0 2.2rem color-mix(in srgb, currentColor 18%, transparent);
 }
 
 .practice-pet--ready .practice-pet__habitat,
@@ -589,6 +717,17 @@ const habitatStateClass = computed(() => `practice-pet--${petState.value.visual 
   }
 }
 
+@keyframes mission-egg {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+
+  50% {
+    transform: translateY(-0.18rem) scale(1.025);
+  }
+}
+
 @media (max-width: 767px) {
   .practice-pet {
     width: 13.8rem;
@@ -625,6 +764,19 @@ const habitatStateClass = computed(() => `practice-pet--${petState.value.visual 
   .practice-pet__habitat-meter {
     right: 0.92rem;
     bottom: 0.88rem;
+  }
+
+  .practice-pet__mission-orb {
+    left: 1.95rem;
+    bottom: 1rem;
+    width: 3.35rem;
+    height: 3.75rem;
+  }
+
+  .practice-pet__mission-ring {
+    left: 0.7rem;
+    bottom: 0.58rem;
+    width: 6.35rem;
   }
 
   .practice-pet__glow {

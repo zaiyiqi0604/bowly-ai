@@ -677,6 +677,7 @@ function closeActiveObservations() {
             :session-active="practiceStore.isSessionActive"
             :is-playing="isPlaying"
             :pitch-stability="pitchStability"
+            :duration-seconds="durationSeconds"
             :note-name="noteName"
             :camera-framing="cameraStatus.framing"
             :start-issue="startIssue"
