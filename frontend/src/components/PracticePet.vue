@@ -12,6 +12,7 @@ import robotImage from "../assets/practice-pets/robot.webp";
 import robotListeningImage from "../assets/practice-pets/robot-listening.webp";
 import robotSteadyImage from "../assets/practice-pets/robot-steady.webp";
 import robotClearerImage from "../assets/practice-pets/robot-clearer.webp";
+import eggNestImage from "../assets/practice-pets/egg-nest.webp";
 
 const props = defineProps<{
   sessionActive: boolean;
@@ -223,6 +224,14 @@ const missionProgress = computed(() => {
   }
   return Math.min(34, Math.max(12, 12 + props.playingSeconds * 2.6));
 });
+const wakeProgress = computed(() => Math.min(100, Math.round((props.playingSeconds / 30) * 100)));
+const wakeSecondsRemaining = computed(() =>
+  Math.max(0, 30 - Math.floor(props.playingSeconds)),
+);
+const missionRingStyle = computed(() => ({
+  "--pet-progress": `${missionProgress.value}%`,
+  "--pet-ring-deg": `${Math.round(wakeProgress.value * 3.6)}deg`,
+}));
 </script>
 
 <template>
@@ -233,7 +242,9 @@ const missionProgress = computed(() => {
   >
     <div class="practice-pet__habitat" aria-hidden="true">
       <span class="practice-pet__habitat-back"></span>
-      <span class="practice-pet__mission-orb"></span>
+      <img class="practice-pet__egg" :src="eggNestImage" alt="" />
+      <span class="practice-pet__sleep-z practice-pet__sleep-z--one">z</span>
+      <span class="practice-pet__sleep-z practice-pet__sleep-z--two">z</span>
       <span class="practice-pet__habitat-mark practice-pet__habitat-mark--one"></span>
       <span class="practice-pet__habitat-mark practice-pet__habitat-mark--two"></span>
       <span class="practice-pet__habitat-meter">
@@ -241,7 +252,16 @@ const missionProgress = computed(() => {
         <span></span>
         <span></span>
       </span>
-      <span class="practice-pet__mission-ring" :style="{ '--pet-progress': `${missionProgress}%` }"></span>
+      <span class="practice-pet__mission-ring" :style="missionRingStyle"></span>
+    </div>
+    <div class="practice-pet__wake-copy" aria-hidden="true">
+      <span class="practice-pet__sparkle">+</span>
+      <strong>Waking up</strong>
+      <small>Keep playing a little longer!</small>
+    </div>
+    <div class="practice-pet__wake-meter" :style="missionRingStyle" aria-hidden="true">
+      <strong>{{ wakeSecondsRemaining }}</strong>
+      <span>sec</span>
     </div>
     <span class="practice-pet__glow"></span>
     <span class="practice-pet__shadow"></span>
@@ -288,6 +308,11 @@ const missionProgress = computed(() => {
   color: rgb(221, 208, 255);
   overflow: visible;
   isolation: isolate;
+}
+
+.practice-pet--mission-egg {
+  width: min(27rem, calc(100vw - 2rem));
+  min-height: 9.5rem;
 }
 
 .practice-pet--great {
@@ -381,25 +406,149 @@ const missionProgress = computed(() => {
 
 .practice-pet__mission-orb {
   position: absolute;
-  left: 2.55rem;
-  bottom: 1.45rem;
+  left: 2.35rem;
+  bottom: 1.36rem;
   z-index: 2;
-  width: 4.25rem;
-  height: 4.65rem;
+  width: 4.85rem;
+  height: 5.2rem;
   border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 52% 52% 46% 46%;
   background:
-    radial-gradient(circle at 38% 26%, rgba(255, 255, 255, 0.32), transparent 18%),
-    radial-gradient(circle at 50% 70%, color-mix(in srgb, currentColor 34%, transparent), transparent 62%),
-    linear-gradient(145deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.02));
+    radial-gradient(circle at 34% 24%, rgba(255, 255, 255, 0.92), transparent 16%),
+    radial-gradient(circle at 62% 68%, color-mix(in srgb, currentColor 36%, transparent), transparent 44%),
+    linear-gradient(145deg, rgb(250, 244, 226), rgb(205, 189, 255) 54%, rgb(136, 113, 214));
   box-shadow:
-    inset 0 1px rgba(255, 255, 255, 0.22),
-    0 0 1.9rem color-mix(in srgb, currentColor 28%, transparent);
+    inset 0 0.8rem 1.25rem rgba(255, 255, 255, 0.26),
+    inset 0 -0.9rem 1.4rem rgba(60, 45, 108, 0.28),
+    0 0.9rem 1.8rem rgba(0, 0, 0, 0.35),
+    0 0 2.4rem color-mix(in srgb, currentColor 32%, transparent);
   opacity: 0;
   transform: translateY(0.25rem) scale(0.82);
   transition:
     opacity 220ms ease,
     transform 240ms ease;
+}
+
+.practice-pet__egg {
+  position: absolute;
+  left: -0.8rem;
+  bottom: 0.1rem;
+  z-index: 3;
+  width: 9.4rem;
+  height: 9.4rem;
+  object-fit: contain;
+  opacity: 0;
+  transform: translateY(0.35rem) scale(0.86);
+  filter: drop-shadow(0 1rem 1.5rem rgba(0, 0, 0, 0.34));
+  transition:
+    opacity 220ms ease,
+    transform 240ms ease;
+}
+
+.practice-pet__sleep-z {
+  position: absolute;
+  z-index: 4;
+  display: none;
+  color: rgba(221, 208, 255, 0.82);
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-shadow: 0 0 12px rgba(196, 181, 253, 0.55);
+  text-transform: uppercase;
+}
+
+.practice-pet__sleep-z--one {
+  left: 0.1rem;
+  top: 1.35rem;
+}
+
+.practice-pet__sleep-z--two {
+  left: 0.9rem;
+  top: 0.7rem;
+  font-size: 0.62rem;
+  opacity: 0.72;
+}
+
+.practice-pet__wake-copy {
+  position: absolute;
+  left: 9.7rem;
+  top: 2.72rem;
+  z-index: 4;
+  display: none;
+  min-width: 8rem;
+  color: rgb(221, 208, 255);
+}
+
+.practice-pet__wake-copy strong {
+  display: block;
+  color: rgb(196, 181, 253);
+  font-size: 1.08rem;
+  font-weight: 900;
+  line-height: 1.05;
+}
+
+.practice-pet__wake-copy small {
+  display: block;
+  margin-top: 0.36rem;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.practice-pet__sparkle {
+  position: absolute;
+  left: -1.12rem;
+  top: -0.05rem;
+  color: rgb(253, 224, 71);
+  font-size: 1.05rem;
+  font-weight: 900;
+  text-shadow: 0 0 14px rgba(253, 224, 71, 0.7);
+  transform: rotate(18deg);
+}
+
+.practice-pet__wake-meter {
+  position: absolute;
+  right: 0.3rem;
+  top: 1.75rem;
+  z-index: 4;
+  display: none;
+  width: 5.1rem;
+  height: 5.1rem;
+  place-items: center;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(22, 18, 29, 0.94) 0 58%, transparent 59%),
+    conic-gradient(currentColor var(--pet-ring-deg), rgba(255, 255, 255, 0.16) 0);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.1),
+    0 0 1.35rem color-mix(in srgb, currentColor 28%, transparent);
+  text-align: center;
+}
+
+.practice-pet__wake-meter::after {
+  position: absolute;
+  inset: 0.55rem;
+  border-radius: inherit;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  content: "";
+}
+
+.practice-pet__wake-meter strong {
+  display: block;
+  color: white;
+  font-size: 1.16rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.practice-pet__wake-meter span {
+  display: block;
+  margin-top: 0.1rem;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.58rem;
+  font-weight: 800;
+  line-height: 1;
+  text-transform: uppercase;
 }
 
 .practice-pet__mission-ring {
@@ -433,48 +582,73 @@ const missionProgress = computed(() => {
 
 .practice-pet--mission-egg .practice-pet__habitat {
   opacity: 1;
+  width: 17rem;
   transform: translateY(-0.08rem) scale(1.02);
 }
 
 .practice-pet--mission-egg .practice-pet__habitat-back {
-  height: 3.25rem;
-  border-radius: 45% 45% 1.35rem 1.35rem;
+  left: -0.2rem;
+  width: 9.5rem;
+  height: 3.8rem;
+  border-radius: 48% 48% 1.55rem 1.55rem;
   background:
-    radial-gradient(ellipse at 50% 0%, color-mix(in srgb, currentColor 34%, transparent), transparent 58%),
-    linear-gradient(135deg, rgba(75, 59, 106, 0.9), rgba(28, 24, 36, 0.76));
+    radial-gradient(ellipse at 50% 0%, color-mix(in srgb, currentColor 48%, transparent), transparent 56%),
+    linear-gradient(135deg, rgba(94, 75, 132, 0.98), rgba(42, 34, 54, 0.96));
   box-shadow:
-    inset 0 1px rgba(255, 255, 255, 0.16),
+    inset 0 1px rgba(255, 255, 255, 0.22),
     0 1rem 2rem rgba(0, 0, 0, 0.28),
-    0 0 2rem color-mix(in srgb, currentColor 18%, transparent);
+    0 0 2.25rem color-mix(in srgb, currentColor 24%, transparent);
 }
 
 .practice-pet--mission-egg .practice-pet__habitat-mark--one {
-  left: 1.45rem;
-  top: 4.05rem;
-  width: 2.3rem;
-  height: 0.32rem;
-  opacity: 0.7;
-  transform: rotate(-9deg);
+  left: 0.25rem;
+  top: 5.1rem;
+  width: 2.9rem;
+  height: 0.24rem;
+  opacity: 0.78;
+  transform: rotate(-12deg);
 }
 
 .practice-pet--mission-egg .practice-pet__habitat-mark--two {
-  right: 2.1rem;
-  top: 4.2rem;
-  width: 1.95rem;
-  height: 0.3rem;
+  left: 5.1rem;
+  right: auto;
+  top: 5.05rem;
+  width: 2.5rem;
+  height: 0.24rem;
   border: 0;
-  opacity: 0.62;
-  transform: rotate(11deg);
+  opacity: 0.7;
+  transform: rotate(13deg);
+}
+
+.practice-pet--mission-egg .practice-pet__egg,
+.practice-pet--mission-egg .practice-pet__sleep-z,
+.practice-pet--mission-egg .practice-pet__wake-copy,
+.practice-pet--mission-egg .practice-pet__wake-meter {
+  display: grid;
+  opacity: 1;
+}
+
+.practice-pet--mission-egg .practice-pet__egg {
+  transform: translateY(0) scale(1);
+  animation: mission-egg 2.8s ease-in-out infinite;
 }
 
 .practice-pet--mission-egg .practice-pet__avatar {
-  opacity: 0.08;
+  opacity: 0;
   transform: translateY(0.2rem) scale(0.82);
-  filter: blur(1px) saturate(0.65) brightness(0.78) drop-shadow(0 1rem 1.1rem rgba(0, 0, 0, 0.32));
+  filter: none;
+}
+
+.practice-pet--mission-egg .practice-pet__status,
+.practice-pet--mission-egg .practice-pet__mission-ring {
+  display: none;
 }
 
 .practice-pet--mission-egg .practice-pet__habitat-meter {
-  opacity: 0.28;
+  left: 10rem;
+  right: auto;
+  bottom: 1.15rem;
+  opacity: 0.5;
 }
 
 .practice-pet--mission-listening .practice-pet__habitat-meter {
@@ -780,6 +954,11 @@ const missionProgress = computed(() => {
     min-height: 7.75rem;
   }
 
+  .practice-pet--mission-egg {
+    width: min(22.5rem, calc(100vw - 1.25rem));
+    min-height: 8.4rem;
+  }
+
   .practice-pet__avatar-wrap {
     left: 0.25rem;
     width: 7.4rem;
@@ -817,6 +996,43 @@ const missionProgress = computed(() => {
     bottom: 1rem;
     width: 3.35rem;
     height: 3.75rem;
+  }
+
+  .practice-pet__egg {
+    left: -0.55rem;
+    bottom: 0.4rem;
+    width: 7.6rem;
+    height: 7.6rem;
+  }
+
+  .practice-pet__wake-copy {
+    left: 7.65rem;
+    top: 2.25rem;
+    min-width: 6.1rem;
+  }
+
+  .practice-pet__wake-copy strong {
+    font-size: 0.92rem;
+  }
+
+  .practice-pet__wake-copy small {
+    font-size: 0.62rem;
+  }
+
+  .practice-pet__wake-meter {
+    right: 0.2rem;
+    top: 1.9rem;
+    width: 4.25rem;
+    height: 4.25rem;
+  }
+
+  .practice-pet--mission-egg .practice-pet__habitat {
+    width: 13.2rem;
+  }
+
+  .practice-pet--mission-egg .practice-pet__habitat-back {
+    width: 7.8rem;
+    height: 3.15rem;
   }
 
   .practice-pet__mission-ring {
