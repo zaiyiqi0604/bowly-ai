@@ -182,7 +182,7 @@ const selectedPetImage = computed(
     <div class="practice-pet__content" :class="{ 'practice-pet__content--message': petState.showMessage }">
       <p class="practice-pet__label">
         <span class="practice-pet__signal">{{ petState.symbol }}</span>
-        {{ petState.label }}
+        <span class="practice-pet__sr-label">{{ petState.label }}</span>
       </p>
       <p v-if="petState.showMessage" class="practice-pet__message">{{ petState.message }}</p>
     </div>
@@ -207,10 +207,10 @@ const selectedPetImage = computed(
 <style scoped>
 .practice-pet {
   position: relative;
-  min-height: 8rem;
+  min-height: 9.4rem;
   width: 12rem;
   border-radius: 2rem;
-  padding: 5.85rem 0.45rem 0;
+  padding: 7.25rem 0.45rem 0;
   color: white;
   overflow: visible;
   isolation: isolate;
@@ -240,7 +240,7 @@ const selectedPetImage = computed(
 .practice-pet__shadow {
   position: absolute;
   left: 2rem;
-  top: 6.25rem;
+  top: 6.75rem;
   z-index: 0;
   width: 7.4rem;
   height: 1.05rem;
@@ -289,36 +289,34 @@ const selectedPetImage = computed(
 .practice-pet__content {
   position: relative;
   z-index: 1;
-  display: inline-flex;
-  max-width: 100%;
+  display: flex;
+  max-width: 11.25rem;
   min-height: 2rem;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  gap: 0.45rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 999px;
-  background: rgba(18, 16, 22, 0.72);
-  padding: 0.42rem 0.62rem;
-  box-shadow: 0 14px 34px rgba(8, 6, 12, 0.34);
-  backdrop-filter: blur(18px);
+  background: rgba(18, 16, 22, 0.54);
+  padding: 0.34rem 0.5rem;
+  box-shadow: 0 10px 24px rgba(8, 6, 12, 0.24);
+  backdrop-filter: blur(12px);
 }
 
 .practice-pet__content--message {
-  display: flex;
-  width: min(14.5rem, calc(100vw - 2rem));
-  min-height: 3.6rem;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: center;
-  border-radius: 1.15rem;
-  padding: 0.58rem 0.78rem;
+  width: min(12rem, calc(100vw - 2rem));
+  justify-content: flex-start;
+  border-radius: 999px;
+  padding: 0.36rem 0.62rem;
 }
 
 .practice-pet__label {
   display: inline-flex;
   align-items: center;
-  gap: 0.38rem;
+  flex: 0 0 auto;
+  gap: 0.34rem;
   margin: 0;
-  font-size: 0.67rem;
+  font-size: 0;
   font-weight: 800;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -328,8 +326,8 @@ const selectedPetImage = computed(
 
 .practice-pet__signal {
   display: grid;
-  width: 1rem;
-  height: 1rem;
+  width: 1.1rem;
+  height: 1.1rem;
   place-items: center;
   border-radius: 999px;
   background: currentColor;
@@ -337,6 +335,15 @@ const selectedPetImage = computed(
   font-size: 0.66rem;
   line-height: 1;
   box-shadow: 0 0 16px color-mix(in srgb, currentColor 45%, transparent);
+}
+
+.practice-pet__sr-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
 }
 
 .practice-pet__chooser {
@@ -390,15 +397,16 @@ const selectedPetImage = computed(
 }
 
 .practice-pet__message {
-  margin: 0.24rem 0 0;
-  display: -webkit-box;
+  margin: 0;
+  min-width: 0;
+  display: block;
   overflow: hidden;
   color: rgba(255, 255, 255, 0.9);
-  font-size: 0.84rem;
+  font-size: 0.76rem;
   font-weight: 700;
-  line-height: 1.35;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 @keyframes pet-float {
@@ -441,8 +449,8 @@ const selectedPetImage = computed(
 @media (max-width: 767px) {
   .practice-pet {
     width: 9.7rem;
-    min-height: 6.75rem;
-    padding-top: 4.95rem;
+    min-height: 7.75rem;
+    padding-top: 6rem;
   }
 
   .practice-pet__avatar-wrap {
@@ -471,12 +479,12 @@ const selectedPetImage = computed(
 
   .practice-pet__shadow {
     left: 1.25rem;
-    top: 5.2rem;
+    top: 5.8rem;
     width: 5.9rem;
   }
 
   .practice-pet__content--message {
-    width: min(11.5rem, calc(100vw - 1.5rem));
+    width: min(10.5rem, calc(100vw - 1.5rem));
   }
 }
 </style>
