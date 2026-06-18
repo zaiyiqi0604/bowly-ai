@@ -162,10 +162,26 @@ const petToneClass = computed(() => `practice-pet--${petState.value.tone as PetT
 const selectedPetImage = computed(
   () => selectedPet.value.images[petState.value.visual as PetVisualState],
 );
+const habitatClass = computed(() => `practice-pet--${selectedPet.value.id}`);
+const habitatStateClass = computed(() => `practice-pet--${petState.value.visual as PetVisualState}`);
 </script>
 
 <template>
-  <section class="practice-pet" :class="petToneClass" aria-live="polite">
+  <section
+    class="practice-pet"
+    :class="[petToneClass, habitatClass, habitatStateClass]"
+    aria-live="polite"
+  >
+    <div class="practice-pet__habitat" aria-hidden="true">
+      <span class="practice-pet__habitat-back"></span>
+      <span class="practice-pet__habitat-mark practice-pet__habitat-mark--one"></span>
+      <span class="practice-pet__habitat-mark practice-pet__habitat-mark--two"></span>
+      <span class="practice-pet__habitat-meter">
+        <span></span>
+        <span></span>
+        <span></span>
+      </span>
+    </div>
     <span class="practice-pet__glow"></span>
     <span class="practice-pet__shadow"></span>
 
@@ -219,6 +235,140 @@ const selectedPetImage = computed(
 
 .practice-pet--coach {
   color: rgb(253, 230, 138);
+}
+
+.practice-pet__habitat {
+  position: absolute;
+  left: 0.15rem;
+  top: 1.4rem;
+  z-index: 0;
+  width: 10.6rem;
+  height: 7.2rem;
+  pointer-events: none;
+  transform-origin: 48% 70%;
+  transition:
+    opacity 180ms ease,
+    transform 220ms ease;
+}
+
+.practice-pet__habitat-back {
+  position: absolute;
+  inset: auto 0 0;
+  height: 4.65rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px 999px 1.75rem 1.75rem;
+  opacity: 0.9;
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.12),
+    0 1.15rem 2rem rgba(0, 0, 0, 0.2);
+}
+
+.practice-pet__habitat-mark {
+  position: absolute;
+  border-radius: 999px;
+  opacity: 0.88;
+}
+
+.practice-pet__habitat-mark--one {
+  left: 1.2rem;
+  top: 1.55rem;
+  width: 1.7rem;
+  height: 0.34rem;
+  transform: rotate(-15deg);
+}
+
+.practice-pet__habitat-mark--two {
+  right: 1.15rem;
+  top: 2.05rem;
+  width: 1.05rem;
+  height: 1.05rem;
+  border: 2px solid currentColor;
+  background: transparent;
+}
+
+.practice-pet__habitat-meter {
+  position: absolute;
+  right: 1.3rem;
+  bottom: 1.05rem;
+  display: flex;
+  align-items: end;
+  gap: 0.18rem;
+  opacity: 0.75;
+}
+
+.practice-pet__habitat-meter span {
+  width: 0.24rem;
+  border-radius: 999px;
+  background: currentColor;
+  transform-origin: bottom;
+  animation: habitat-meter 1.15s ease-in-out infinite;
+}
+
+.practice-pet__habitat-meter span:nth-child(1) {
+  height: 0.5rem;
+}
+
+.practice-pet__habitat-meter span:nth-child(2) {
+  height: 0.86rem;
+  animation-delay: 120ms;
+}
+
+.practice-pet__habitat-meter span:nth-child(3) {
+  height: 0.64rem;
+  animation-delay: 240ms;
+}
+
+.practice-pet--ready .practice-pet__habitat,
+.practice-pet--listening .practice-pet__habitat {
+  opacity: 0.72;
+}
+
+.practice-pet--steady .practice-pet__habitat,
+.practice-pet--great .practice-pet__habitat {
+  opacity: 1;
+  transform: translateY(-0.12rem) scale(1.03);
+}
+
+.practice-pet--clearer .practice-pet__habitat,
+.practice-pet--coach .practice-pet__habitat {
+  opacity: 0.88;
+  transform: translateX(-0.08rem);
+}
+
+.practice-pet--owl .practice-pet__habitat-back {
+  background:
+    radial-gradient(circle at 50% 0%, rgba(201, 185, 255, 0.2), transparent 56%),
+    linear-gradient(135deg, rgba(78, 65, 118, 0.9), rgba(36, 30, 49, 0.7));
+}
+
+.practice-pet--owl .practice-pet__habitat-mark--one,
+.practice-pet--owl .practice-pet__habitat-mark--two {
+  background: rgba(196, 181, 253, 0.52);
+  color: rgb(196, 181, 253);
+}
+
+.practice-pet--puppy .practice-pet__habitat-back {
+  background:
+    radial-gradient(circle at 35% 8%, rgba(252, 211, 77, 0.18), transparent 52%),
+    linear-gradient(135deg, rgba(80, 55, 35, 0.9), rgba(34, 27, 33, 0.7));
+}
+
+.practice-pet--puppy .practice-pet__habitat-mark--one,
+.practice-pet--puppy .practice-pet__habitat-mark--two {
+  background: rgba(251, 191, 36, 0.52);
+  color: rgb(251, 191, 36);
+}
+
+.practice-pet--robot .practice-pet__habitat-back {
+  background:
+    radial-gradient(circle at 50% 10%, rgba(168, 85, 247, 0.24), transparent 50%),
+    linear-gradient(135deg, rgba(32, 39, 75, 0.92), rgba(20, 18, 30, 0.72));
+}
+
+.practice-pet--robot .practice-pet__habitat-mark--one,
+.practice-pet--robot .practice-pet__habitat-mark--two {
+  background: rgba(167, 139, 250, 0.54);
+  color: rgb(167, 139, 250);
 }
 
 .practice-pet__glow {
@@ -426,6 +576,19 @@ const selectedPetImage = computed(
   }
 }
 
+@keyframes habitat-meter {
+  0%,
+  100% {
+    transform: scaleY(0.62);
+    opacity: 0.55;
+  }
+
+  50% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
 @media (max-width: 767px) {
   .practice-pet {
     width: 13.8rem;
@@ -436,6 +599,32 @@ const selectedPetImage = computed(
     left: 0.25rem;
     width: 7.4rem;
     height: 7.4rem;
+  }
+
+  .practice-pet__habitat {
+    left: -0.25rem;
+    top: 1.05rem;
+    width: 8.35rem;
+    height: 6.3rem;
+  }
+
+  .practice-pet__habitat-back {
+    height: 3.9rem;
+  }
+
+  .practice-pet__habitat-mark--one {
+    left: 0.95rem;
+    top: 1.35rem;
+  }
+
+  .practice-pet__habitat-mark--two {
+    right: 0.8rem;
+    top: 1.65rem;
+  }
+
+  .practice-pet__habitat-meter {
+    right: 0.92rem;
+    bottom: 0.88rem;
   }
 
   .practice-pet__glow {
