@@ -105,7 +105,7 @@ const petState = computed(() => {
       label: "Ready",
       message: "",
       face: "calm",
-      symbol: "✓",
+      symbol: "OK",
       showMessage: false,
       visual: "ready",
     };
@@ -117,7 +117,7 @@ const petState = computed(() => {
       label: "Hint",
       message: props.microFeedback,
       face: "focused",
-      symbol: "•",
+      symbol: "i",
       showMessage: true,
       visual: "clearer",
     };
@@ -127,9 +127,9 @@ const petState = computed(() => {
     return {
       tone: "great",
       label: "Steady",
-      message: "Nice phrase",
+      message: "",
       face: "happy",
-      symbol: "♪",
+      symbol: "~",
       showMessage: false,
       visual: "steady",
     };
@@ -141,7 +141,7 @@ const petState = computed(() => {
       label: "Playing",
       message: "",
       face: "focused",
-      symbol: "♪",
+      symbol: "~",
       showMessage: false,
       visual: "listening",
     };
@@ -152,7 +152,7 @@ const petState = computed(() => {
     label: "Listening",
     message: "",
     face: "calm",
-    symbol: "•",
+    symbol: "...",
     showMessage: false,
     visual: "listening",
   };
@@ -165,13 +165,10 @@ const selectedPetImage = computed(
 </script>
 
 <template>
-  <section
-    class="practice-pet"
-    :class="petToneClass"
-    aria-live="polite"
-  >
+  <section class="practice-pet" :class="petToneClass" aria-live="polite">
     <span class="practice-pet__glow"></span>
     <span class="practice-pet__shadow"></span>
+
     <div class="practice-pet__avatar-wrap" :class="`practice-pet__avatar-wrap--${petState.face}`">
       <img
         class="practice-pet__avatar"
@@ -179,12 +176,14 @@ const selectedPetImage = computed(
         :alt="`${selectedPet.name} practice buddy`"
       />
     </div>
-    <div class="practice-pet__content" :class="{ 'practice-pet__content--message': petState.showMessage }">
-      <p class="practice-pet__label">
-        <span class="practice-pet__signal">{{ petState.symbol }}</span>
-        <span class="practice-pet__sr-label">{{ petState.label }}</span>
-      </p>
-      <p v-if="petState.showMessage" class="practice-pet__message">{{ petState.message }}</p>
+
+    <div
+      class="practice-pet__status"
+      :class="{ 'practice-pet__status--message': petState.showMessage }"
+    >
+      <span class="practice-pet__signal">{{ petState.symbol }}</span>
+      <span v-if="petState.showMessage" class="practice-pet__message">{{ petState.message }}</span>
+      <span v-else class="practice-pet__sr-label">{{ petState.label }}</span>
     </div>
 
     <div class="practice-pet__chooser" aria-label="Choose practice buddy">
@@ -207,11 +206,9 @@ const selectedPetImage = computed(
 <style scoped>
 .practice-pet {
   position: relative;
-  min-height: 9.4rem;
-  width: 12rem;
-  border-radius: 2rem;
-  padding: 7.25rem 0.45rem 0;
-  color: white;
+  width: 18rem;
+  min-height: 9.2rem;
+  color: rgb(221, 208, 255);
   overflow: visible;
   isolation: isolate;
 }
@@ -226,11 +223,11 @@ const selectedPetImage = computed(
 
 .practice-pet__glow {
   position: absolute;
-  left: 1.9rem;
-  top: 0.9rem;
+  left: 1.8rem;
+  top: 0.8rem;
   z-index: 0;
-  width: 7.2rem;
-  height: 6.3rem;
+  width: 7.4rem;
+  height: 6.4rem;
   border-radius: 999px;
   background: rgba(139, 92, 246, 0.18);
   filter: blur(20px);
@@ -239,10 +236,10 @@ const selectedPetImage = computed(
 
 .practice-pet__shadow {
   position: absolute;
-  left: 2rem;
-  top: 6.75rem;
+  left: 1.95rem;
+  top: 6.78rem;
   z-index: 0;
-  width: 7.4rem;
+  width: 7.7rem;
   height: 1.05rem;
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.38);
@@ -252,11 +249,11 @@ const selectedPetImage = computed(
 
 .practice-pet__avatar-wrap {
   position: absolute;
-  left: 0.8rem;
+  left: 0.65rem;
   top: 0;
   display: grid;
-  width: 9.4rem;
-  height: 9.4rem;
+  width: 9.6rem;
+  height: 9.6rem;
   place-items: center;
   overflow: visible;
   animation: pet-float 3.2s ease-in-out infinite;
@@ -286,55 +283,51 @@ const selectedPetImage = computed(
   filter: saturate(0.9) brightness(0.96) drop-shadow(0 1rem 1.1rem rgba(0, 0, 0, 0.32));
 }
 
-.practice-pet__content {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  max-width: 11.25rem;
-  min-height: 2rem;
+.practice-pet__status {
+  position: absolute;
+  left: 9.9rem;
+  top: 6.45rem;
+  z-index: 2;
+  display: inline-flex;
+  min-height: 1.9rem;
   align-items: center;
-  justify-content: center;
-  gap: 0.45rem;
+  gap: 0.42rem;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 999px;
-  background: rgba(18, 16, 22, 0.54);
-  padding: 0.34rem 0.5rem;
-  box-shadow: 0 10px 24px rgba(8, 6, 12, 0.24);
-  backdrop-filter: blur(12px);
+  background: rgba(18, 16, 22, 0.48);
+  padding: 0.32rem;
+  box-shadow: 0 10px 24px rgba(8, 6, 12, 0.22);
+  backdrop-filter: blur(10px);
 }
 
-.practice-pet__content--message {
-  width: min(12rem, calc(100vw - 2rem));
-  justify-content: flex-start;
-  border-radius: 999px;
-  padding: 0.36rem 0.62rem;
-}
-
-.practice-pet__label {
-  display: inline-flex;
-  align-items: center;
-  flex: 0 0 auto;
-  gap: 0.34rem;
-  margin: 0;
-  font-size: 0;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: rgba(221, 208, 255, 0.9);
-  text-shadow: 0 1px 8px rgba(139, 92, 246, 0.24);
+.practice-pet__status--message {
+  max-width: min(11.75rem, calc(100vw - 2rem));
+  padding-right: 0.65rem;
 }
 
 .practice-pet__signal {
   display: grid;
-  width: 1.1rem;
-  height: 1.1rem;
+  min-width: 1.12rem;
+  height: 1.12rem;
   place-items: center;
   border-radius: 999px;
   background: currentColor;
   color: #18131f;
-  font-size: 0.66rem;
+  font-size: 0.58rem;
+  font-weight: 900;
   line-height: 1;
   box-shadow: 0 0 16px color-mix(in srgb, currentColor 45%, transparent);
+}
+
+.practice-pet__message {
+  min-width: 0;
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .practice-pet__sr-label {
@@ -348,7 +341,7 @@ const selectedPetImage = computed(
 
 .practice-pet__chooser {
   position: absolute;
-  left: 8.25rem;
+  left: 8.45rem;
   top: 0.45rem;
   z-index: 3;
   display: flex;
@@ -396,19 +389,6 @@ const selectedPetImage = computed(
   object-fit: cover;
 }
 
-.practice-pet__message {
-  margin: 0;
-  min-width: 0;
-  display: block;
-  overflow: hidden;
-  color: rgba(255, 255, 255, 0.9);
-  font-size: 0.76rem;
-  font-weight: 700;
-  line-height: 1.2;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 @keyframes pet-float {
   0%,
   100% {
@@ -448,43 +428,43 @@ const selectedPetImage = computed(
 
 @media (max-width: 767px) {
   .practice-pet {
-    width: 9.7rem;
+    width: 13.8rem;
     min-height: 7.75rem;
-    padding-top: 6rem;
   }
 
   .practice-pet__avatar-wrap {
-    left: 0.35rem;
-    width: 7.2rem;
-    height: 7.2rem;
-  }
-
-  .practice-pet__label {
-    font-size: 0.64rem;
-  }
-
-  .practice-pet__message {
-    font-size: 0.78rem;
-  }
-
-  .practice-pet__chooser {
-    display: none;
+    left: 0.25rem;
+    width: 7.4rem;
+    height: 7.4rem;
   }
 
   .practice-pet__glow {
-    left: 1.2rem;
+    left: 1.1rem;
     width: 5.8rem;
     height: 5rem;
   }
 
   .practice-pet__shadow {
-    left: 1.25rem;
+    left: 1.2rem;
     top: 5.8rem;
     width: 5.9rem;
   }
 
-  .practice-pet__content--message {
-    width: min(10.5rem, calc(100vw - 1.5rem));
+  .practice-pet__status {
+    left: 7.2rem;
+    top: 5.45rem;
+  }
+
+  .practice-pet__status--message {
+    max-width: min(8.5rem, calc(100vw - 1.5rem));
+  }
+
+  .practice-pet__message {
+    font-size: 0.72rem;
+  }
+
+  .practice-pet__chooser {
+    display: none;
   }
 }
 </style>
