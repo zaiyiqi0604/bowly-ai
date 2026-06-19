@@ -263,6 +263,7 @@ const missionRingStyle = computed(() => ({
     <div class="practice-pet__wake-meter" :style="missionRingStyle" aria-hidden="true">
       <strong>{{ wakeSecondsRemaining }}</strong>
       <span>sec</span>
+      <em>of music</em>
     </div>
     <span class="practice-pet__glow"></span>
     <span class="practice-pet__shadow"></span>
@@ -451,15 +452,15 @@ const missionRingStyle = computed(() => ({
 
 .practice-pet__hatch-preview {
   position: absolute;
-  left: 5.35rem;
-  bottom: 1.15rem;
+  left: 4.95rem;
+  bottom: 0.9rem;
   z-index: 2;
-  width: 4.35rem;
-  height: 4.35rem;
+  width: 5.15rem;
+  height: 5.15rem;
   object-fit: contain;
   opacity: 0;
-  transform: translateX(-0.75rem) scale(0.7);
-  filter: blur(0.4px) saturate(0.82) drop-shadow(0 0.8rem 1rem rgba(0, 0, 0, 0.32));
+  transform: translateX(-0.55rem) scale(0.72);
+  filter: blur(0.15px) saturate(0.92) brightness(1.04) drop-shadow(0 0.8rem 1rem rgba(0, 0, 0, 0.34));
   transition:
     opacity 240ms ease,
     transform 260ms ease;
@@ -529,28 +530,29 @@ const missionRingStyle = computed(() => ({
 
 .practice-pet__wake-meter {
   position: absolute;
-  left: 15.6rem;
-  top: 1.95rem;
+  left: 15.25rem;
+  top: 1.52rem;
   z-index: 4;
   display: none;
-  width: 4.35rem;
-  height: 4.35rem;
+  width: 4.95rem;
+  height: 4.95rem;
   place-items: center;
   border-radius: 999px;
   background:
-    radial-gradient(circle at 50% 50%, rgba(22, 18, 29, 0.94) 0 58%, transparent 59%),
-    conic-gradient(currentColor var(--pet-ring-deg), rgba(255, 255, 255, 0.16) 0);
+    radial-gradient(circle at 50% 50%, rgba(20, 16, 29, 0.96) 0 52%, transparent 53%),
+    conic-gradient(rgb(196, 181, 253) var(--pet-ring-deg), rgba(255, 255, 255, 0.15) 0);
   box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.1),
-    0 0 1.35rem color-mix(in srgb, currentColor 28%, transparent);
+    inset 0 0 0 1px rgba(255, 255, 255, 0.11),
+    0 0 0 0.35rem rgba(196, 181, 253, 0.06),
+    0 0 1.65rem rgba(196, 181, 253, 0.26);
   text-align: center;
 }
 
 .practice-pet__wake-meter::after {
   position: absolute;
-  inset: 0.46rem;
+  inset: 0.48rem;
   border-radius: inherit;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   content: "";
 }
 
@@ -570,6 +572,16 @@ const missionRingStyle = computed(() => ({
   font-weight: 800;
   line-height: 1;
   text-transform: uppercase;
+}
+
+.practice-pet__wake-meter em {
+  display: block;
+  margin-top: 0.12rem;
+  color: rgba(255, 255, 255, 0.54);
+  font-size: 0.46rem;
+  font-style: normal;
+  font-weight: 700;
+  line-height: 1;
 }
 
 .practice-pet__mission-ring {
@@ -656,8 +668,8 @@ const missionRingStyle = computed(() => ({
 }
 
 .practice-pet--mission-egg .practice-pet__hatch-preview {
-  opacity: 0.18;
-  transform: translateX(0) scale(0.86);
+  opacity: 0.32;
+  transform: translateX(0) scale(0.9);
 }
 
 .practice-pet--mission-egg .practice-pet__avatar {
@@ -1106,10 +1118,19 @@ const missionRingStyle = computed(() => ({
   }
 
   .practice-pet__wake-meter {
-    right: 0.2rem;
-    top: 1.9rem;
-    width: 4.25rem;
-    height: 4.25rem;
+    left: 14.05rem;
+    right: auto;
+    top: 1.68rem;
+    width: 4.05rem;
+    height: 4.05rem;
+  }
+
+  .practice-pet__wake-meter strong {
+    font-size: 0.92rem;
+  }
+
+  .practice-pet__wake-meter em {
+    display: none;
   }
 
   .practice-pet--mission-egg .practice-pet__habitat {
