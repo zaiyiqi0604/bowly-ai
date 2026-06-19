@@ -31,6 +31,7 @@ type PetId = "owl" | "puppy" | "robot";
 type PetTone = "ready" | "listening" | "playing" | "great" | "coach";
 type PetVisualState = "ready" | "listening" | "steady" | "clearer";
 type PetMissionStage = "egg" | "listening" | "calm";
+type PetReaction = "sleepy" | "curious" | "listening" | "steady" | "concerned" | "celebrating";
 
 const PET_STORAGE_KEY = "bowly-practice-pet";
 const PET_MISSION_STORAGE_KEY = "bowly-practice-pet-mission";
@@ -232,12 +233,29 @@ const missionRingStyle = computed(() => ({
   "--pet-progress": `${missionProgress.value}%`,
   "--pet-ring-deg": `${Math.round(wakeProgress.value * 3.6)}deg`,
 }));
+const reaction = computed<PetReaction>(() => {
+  if (missionStage.value === "egg") return "sleepy";
+  if (props.startIssue || props.cameraFraming === "adjust") return "concerned";
+  if (!props.sessionActive) return selectedPetAwake.value ? "curious" : "sleepy";
+  if (props.stablePlayingSeconds >= 15 || props.pitchStability >= 82) return "celebrating";
+  if (props.isPlaying && props.pitchStability >= 70) return "steady";
+  if (props.isPlaying) return "listening";
+  return "curious";
+});
+const reactionClass = computed(() => `practice-pet--reaction-${reaction.value}`);
+const reactionLabel = computed(() => {
+  if (reaction.value === "steady" || reaction.value === "celebrating") return "Steady";
+  if (reaction.value === "concerned") return "View";
+  if (reaction.value === "curious") return "Ready";
+  if (reaction.value === "listening") return "Listening";
+  return "";
+});
 </script>
 
 <template>
   <section
     class="practice-pet"
-    :class="[petToneClass, habitatClass, habitatStateClass, missionStageClass]"
+    :class="[petToneClass, habitatClass, habitatStateClass, missionStageClass, reactionClass]"
     aria-live="polite"
   >
     <div class="practice-pet__habitat" aria-hidden="true">
@@ -278,6 +296,13 @@ const missionRingStyle = computed(() => ({
         />
       </Transition>
     </div>
+    <span
+      v-if="missionStage !== 'egg' && reactionLabel"
+      class="practice-pet__reaction-chip"
+      aria-hidden="true"
+    >
+      {{ reactionLabel }}
+    </span>
 
     <div
       class="practice-pet__status"
@@ -858,6 +883,54 @@ const missionRingStyle = computed(() => ({
   filter: saturate(0.9) brightness(0.96) drop-shadow(0 1rem 1.1rem rgba(0, 0, 0, 0.32));
 }
 
+.practice-pet--reaction-listening .practice-pet__avatar-wrap {
+  animation: pet-listen 1.25s ease-in-out infinite;
+}
+
+.practice-pet--reaction-steady .practice-pet__avatar-wrap,
+.practice-pet--reaction-celebrating .practice-pet__avatar-wrap {
+  animation: pet-happy-bounce 1.05s ease-in-out infinite;
+}
+
+.practice-pet--reaction-curious .practice-pet__avatar-wrap {
+  animation: pet-curious 2.4s ease-in-out infinite;
+}
+
+.practice-pet--reaction-concerned .practice-pet__avatar-wrap {
+  animation: pet-concerned 1.6s ease-in-out infinite;
+}
+
+.practice-pet--reaction-celebrating .practice-pet__habitat-meter span {
+  animation-duration: 0.72s;
+}
+
+.practice-pet--reaction-curious .practice-pet__habitat-meter {
+  opacity: 0.36;
+}
+
+.practice-pet--reaction-concerned .practice-pet__habitat-meter {
+  color: rgb(253, 230, 138);
+  opacity: 0.62;
+}
+
+.practice-pet__reaction-chip {
+  position: absolute;
+  left: 7.75rem;
+  top: 1.55rem;
+  z-index: 3;
+  border: 1px solid color-mix(in srgb, currentColor 38%, transparent);
+  border-radius: 999px;
+  background: rgba(18, 16, 22, 0.56);
+  padding: 0.18rem 0.48rem;
+  color: currentColor;
+  font-size: 0.58rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  box-shadow: 0 0.75rem 1.25rem rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(10px);
+}
+
 .practice-pet__status {
   position: absolute;
   left: 9.9rem;
@@ -972,6 +1045,54 @@ const missionRingStyle = computed(() => ({
 
   50% {
     transform: translateY(-0.35rem) rotate(1deg);
+  }
+}
+
+@keyframes pet-listen {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-1deg);
+  }
+
+  50% {
+    transform: translateY(-0.18rem) rotate(1deg);
+  }
+}
+
+@keyframes pet-happy-bounce {
+  0%,
+  100% {
+    transform: translateY(-0.12rem) scale(1);
+  }
+
+  50% {
+    transform: translateY(-0.48rem) scale(1.035);
+  }
+}
+
+@keyframes pet-curious {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-2deg);
+  }
+
+  50% {
+    transform: translateY(-0.16rem) rotate(2deg);
+  }
+}
+
+@keyframes pet-concerned {
+  0%,
+  100% {
+    transform: translateX(0) rotate(-3deg);
+  }
+
+  35% {
+    transform: translateX(-0.08rem) rotate(-5deg);
+  }
+
+  70% {
+    transform: translateX(0.08rem) rotate(-1deg);
   }
 }
 
@@ -1159,6 +1280,12 @@ const missionRingStyle = computed(() => ({
   .practice-pet__status {
     left: 7.2rem;
     top: 5.45rem;
+  }
+
+  .practice-pet__reaction-chip {
+    left: 5.95rem;
+    top: 1.2rem;
+    font-size: 0.52rem;
   }
 
   .practice-pet__status--message {
