@@ -242,6 +242,7 @@ const missionRingStyle = computed(() => ({
   >
     <div class="practice-pet__habitat" aria-hidden="true">
       <span class="practice-pet__habitat-back"></span>
+      <img class="practice-pet__hatch-preview" :src="selectedPetImage" alt="" />
       <img class="practice-pet__egg" :src="eggNestImage" alt="" />
       <span class="practice-pet__sleep-z practice-pet__sleep-z--one">z</span>
       <span class="practice-pet__sleep-z practice-pet__sleep-z--two">z</span>
@@ -267,11 +268,14 @@ const missionRingStyle = computed(() => ({
     <span class="practice-pet__shadow"></span>
 
     <div class="practice-pet__avatar-wrap" :class="`practice-pet__avatar-wrap--${petState.face}`">
-      <img
-        class="practice-pet__avatar"
-        :src="selectedPetImage"
-        :alt="`${selectedPet.name} practice buddy`"
-      />
+      <Transition name="pet-sprite">
+        <img
+          :key="selectedPetImage"
+          class="practice-pet__avatar"
+          :src="selectedPetImage"
+          :alt="`${selectedPet.name} practice buddy`"
+        />
+      </Transition>
     </div>
 
     <div
@@ -311,8 +315,8 @@ const missionRingStyle = computed(() => ({
 }
 
 .practice-pet--mission-egg {
-  width: min(27rem, calc(100vw - 2rem));
-  min-height: 9.5rem;
+  width: min(22rem, calc(100vw - 1.25rem));
+  min-height: 8.4rem;
 }
 
 .practice-pet--great {
@@ -431,11 +435,11 @@ const missionRingStyle = computed(() => ({
 
 .practice-pet__egg {
   position: absolute;
-  left: -0.8rem;
-  bottom: 0.1rem;
+  left: -0.5rem;
+  bottom: 0.45rem;
   z-index: 3;
-  width: 9.4rem;
-  height: 9.4rem;
+  width: 7.6rem;
+  height: 7.6rem;
   object-fit: contain;
   opacity: 0;
   transform: translateY(0.35rem) scale(0.86);
@@ -443,6 +447,22 @@ const missionRingStyle = computed(() => ({
   transition:
     opacity 220ms ease,
     transform 240ms ease;
+}
+
+.practice-pet__hatch-preview {
+  position: absolute;
+  left: 5.35rem;
+  bottom: 1.15rem;
+  z-index: 2;
+  width: 4.35rem;
+  height: 4.35rem;
+  object-fit: contain;
+  opacity: 0;
+  transform: translateX(-0.75rem) scale(0.7);
+  filter: blur(0.4px) saturate(0.82) drop-shadow(0 0.8rem 1rem rgba(0, 0, 0, 0.32));
+  transition:
+    opacity 240ms ease,
+    transform 260ms ease;
 }
 
 .practice-pet__sleep-z {
@@ -457,31 +477,31 @@ const missionRingStyle = computed(() => ({
 }
 
 .practice-pet__sleep-z--one {
-  left: 0.1rem;
-  top: 1.35rem;
+  left: 0.2rem;
+  top: 1.25rem;
 }
 
 .practice-pet__sleep-z--two {
-  left: 0.9rem;
-  top: 0.7rem;
+  left: 0.95rem;
+  top: 0.65rem;
   font-size: 0.62rem;
   opacity: 0.72;
 }
 
 .practice-pet__wake-copy {
   position: absolute;
-  left: 9.7rem;
-  top: 2.72rem;
+  left: 7.35rem;
+  top: 2.35rem;
   z-index: 4;
   display: none;
-  min-width: 8rem;
+  min-width: 6.8rem;
   color: rgb(221, 208, 255);
 }
 
 .practice-pet__wake-copy strong {
   display: block;
   color: rgb(196, 181, 253);
-  font-size: 1.08rem;
+  font-size: 1rem;
   font-weight: 900;
   line-height: 1.05;
 }
@@ -490,7 +510,8 @@ const missionRingStyle = computed(() => ({
   display: block;
   margin-top: 0.36rem;
   color: rgba(255, 255, 255, 0.72);
-  font-size: 0.72rem;
+  max-width: 7.1rem;
+  font-size: 0.66rem;
   font-weight: 600;
   line-height: 1.2;
 }
@@ -508,12 +529,12 @@ const missionRingStyle = computed(() => ({
 
 .practice-pet__wake-meter {
   position: absolute;
-  right: 0.3rem;
-  top: 1.75rem;
+  left: 15.6rem;
+  top: 1.95rem;
   z-index: 4;
   display: none;
-  width: 5.1rem;
-  height: 5.1rem;
+  width: 4.35rem;
+  height: 4.35rem;
   place-items: center;
   border-radius: 999px;
   background:
@@ -527,7 +548,7 @@ const missionRingStyle = computed(() => ({
 
 .practice-pet__wake-meter::after {
   position: absolute;
-  inset: 0.55rem;
+  inset: 0.46rem;
   border-radius: inherit;
   border: 1px solid rgba(255, 255, 255, 0.08);
   content: "";
@@ -536,7 +557,7 @@ const missionRingStyle = computed(() => ({
 .practice-pet__wake-meter strong {
   display: block;
   color: white;
-  font-size: 1.16rem;
+  font-size: 1.02rem;
   font-weight: 900;
   line-height: 1;
 }
@@ -545,7 +566,7 @@ const missionRingStyle = computed(() => ({
   display: block;
   margin-top: 0.1rem;
   color: rgba(255, 255, 255, 0.72);
-  font-size: 0.58rem;
+  font-size: 0.52rem;
   font-weight: 800;
   line-height: 1;
   text-transform: uppercase;
@@ -582,14 +603,14 @@ const missionRingStyle = computed(() => ({
 
 .practice-pet--mission-egg .practice-pet__habitat {
   opacity: 1;
-  width: 17rem;
+  width: 13.9rem;
   transform: translateY(-0.08rem) scale(1.02);
 }
 
 .practice-pet--mission-egg .practice-pet__habitat-back {
   left: -0.2rem;
-  width: 9.5rem;
-  height: 3.8rem;
+  width: 8.1rem;
+  height: 3.25rem;
   border-radius: 48% 48% 1.55rem 1.55rem;
   background:
     radial-gradient(ellipse at 50% 0%, color-mix(in srgb, currentColor 48%, transparent), transparent 56%),
@@ -602,18 +623,18 @@ const missionRingStyle = computed(() => ({
 
 .practice-pet--mission-egg .practice-pet__habitat-mark--one {
   left: 0.25rem;
-  top: 5.1rem;
-  width: 2.9rem;
+  top: 4.75rem;
+  width: 2.5rem;
   height: 0.24rem;
   opacity: 0.78;
   transform: rotate(-12deg);
 }
 
 .practice-pet--mission-egg .practice-pet__habitat-mark--two {
-  left: 5.1rem;
+  left: 4.7rem;
   right: auto;
-  top: 5.05rem;
-  width: 2.5rem;
+  top: 4.75rem;
+  width: 2.15rem;
   height: 0.24rem;
   border: 0;
   opacity: 0.7;
@@ -621,6 +642,7 @@ const missionRingStyle = computed(() => ({
 }
 
 .practice-pet--mission-egg .practice-pet__egg,
+.practice-pet--mission-egg .practice-pet__hatch-preview,
 .practice-pet--mission-egg .practice-pet__sleep-z,
 .practice-pet--mission-egg .practice-pet__wake-copy,
 .practice-pet--mission-egg .practice-pet__wake-meter {
@@ -631,6 +653,11 @@ const missionRingStyle = computed(() => ({
 .practice-pet--mission-egg .practice-pet__egg {
   transform: translateY(0) scale(1);
   animation: mission-egg 2.8s ease-in-out infinite;
+}
+
+.practice-pet--mission-egg .practice-pet__hatch-preview {
+  opacity: 0.18;
+  transform: translateX(0) scale(0.86);
 }
 
 .practice-pet--mission-egg .practice-pet__avatar {
@@ -645,10 +672,10 @@ const missionRingStyle = computed(() => ({
 }
 
 .practice-pet--mission-egg .practice-pet__habitat-meter {
-  left: 10rem;
+  left: 13.3rem;
   right: auto;
-  bottom: 1.15rem;
-  opacity: 0.5;
+  bottom: 0.95rem;
+  opacity: 0.42;
 }
 
 .practice-pet--mission-listening .practice-pet__habitat-meter {
@@ -765,6 +792,48 @@ const missionRingStyle = computed(() => ({
   transition:
     transform 220ms ease,
     filter 220ms ease;
+}
+
+.pet-sprite-enter-active,
+.pet-sprite-leave-active {
+  transition:
+    opacity 220ms ease,
+    transform 260ms ease,
+    filter 260ms ease;
+}
+
+.pet-sprite-leave-active {
+  position: absolute;
+}
+
+.pet-sprite-enter-from {
+  opacity: 0;
+  transform: translateY(0.35rem) scale(0.88);
+  filter: blur(2px) brightness(1.18) drop-shadow(0 1rem 1.1rem rgba(0, 0, 0, 0.32));
+}
+
+.pet-sprite-leave-to {
+  opacity: 0;
+  transform: translateY(-0.15rem) scale(1.04);
+  filter: blur(2px) brightness(1.18) drop-shadow(0 1rem 1.1rem rgba(0, 0, 0, 0.32));
+}
+
+.practice-pet__avatar-wrap::after {
+  position: absolute;
+  inset: 1.2rem;
+  z-index: -1;
+  border-radius: 999px;
+  background: color-mix(in srgb, currentColor 30%, transparent);
+  opacity: 0;
+  filter: blur(1.3rem);
+  content: "";
+  transform: scale(0.7);
+}
+
+.practice-pet--listening .practice-pet__avatar-wrap::after,
+.practice-pet--playing .practice-pet__avatar-wrap::after,
+.practice-pet--great .practice-pet__avatar-wrap::after {
+  animation: pet-transition-glow 900ms ease-out;
 }
 
 .practice-pet__avatar-wrap--happy .practice-pet__avatar {
@@ -945,6 +1014,23 @@ const missionRingStyle = computed(() => ({
 
   50% {
     transform: translateY(-0.18rem) scale(1.025);
+  }
+}
+
+@keyframes pet-transition-glow {
+  0% {
+    opacity: 0;
+    transform: scale(0.55);
+  }
+
+  35% {
+    opacity: 0.6;
+    transform: scale(1.05);
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(1.32);
   }
 }
 
