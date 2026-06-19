@@ -654,7 +654,6 @@ const missionRingStyle = computed(() => ({
 }
 
 .practice-pet--mission-egg .practice-pet__egg,
-.practice-pet--mission-egg .practice-pet__hatch-preview,
 .practice-pet--mission-egg .practice-pet__sleep-z,
 .practice-pet--mission-egg .practice-pet__wake-copy,
 .practice-pet--mission-egg .practice-pet__wake-meter {
@@ -665,11 +664,6 @@ const missionRingStyle = computed(() => ({
 .practice-pet--mission-egg .practice-pet__egg {
   transform: translateY(0) scale(1);
   animation: mission-egg 2.8s ease-in-out infinite;
-}
-
-.practice-pet--mission-egg .practice-pet__hatch-preview {
-  opacity: 0.32;
-  transform: translateX(0) scale(0.9);
 }
 
 .practice-pet--mission-egg .practice-pet__avatar {
