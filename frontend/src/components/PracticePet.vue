@@ -263,7 +263,7 @@ const missionRingStyle = computed(() => ({
     <div class="practice-pet__wake-meter" :style="missionRingStyle" aria-hidden="true">
       <strong>{{ wakeSecondsRemaining }}</strong>
       <span>sec</span>
-      <em>of music</em>
+      <em>music</em>
     </div>
     <span class="practice-pet__glow"></span>
     <span class="practice-pet__shadow"></span>
@@ -536,7 +536,8 @@ const missionRingStyle = computed(() => ({
   display: none;
   width: 4.95rem;
   height: 4.95rem;
-  place-items: center;
+  align-content: center;
+  justify-items: center;
   border-radius: 999px;
   background:
     radial-gradient(circle at 50% 50%, rgba(20, 16, 29, 0.96) 0 52%, transparent 53%),
@@ -559,29 +560,30 @@ const missionRingStyle = computed(() => ({
 .practice-pet__wake-meter strong {
   display: block;
   color: white;
-  font-size: 1.02rem;
+  font-size: 1.08rem;
   font-weight: 900;
-  line-height: 1;
+  line-height: 0.92;
 }
 
 .practice-pet__wake-meter span {
   display: block;
-  margin-top: 0.1rem;
+  margin-top: 0.16rem;
   color: rgba(255, 255, 255, 0.72);
   font-size: 0.52rem;
   font-weight: 800;
-  line-height: 1;
+  line-height: 0.9;
   text-transform: uppercase;
 }
 
 .practice-pet__wake-meter em {
   display: block;
-  margin-top: 0.12rem;
+  margin-top: 0.24rem;
   color: rgba(255, 255, 255, 0.54);
-  font-size: 0.46rem;
+  font-size: 0.44rem;
   font-style: normal;
   font-weight: 700;
-  line-height: 1;
+  line-height: 0.9;
+  text-transform: uppercase;
 }
 
 .practice-pet__mission-ring {
