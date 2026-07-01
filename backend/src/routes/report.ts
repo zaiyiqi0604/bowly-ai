@@ -91,6 +91,18 @@ const reportRequestSchema = z.object({
     inTunePercent: z.number().min(0).max(100),
     stablePitchPercent: z.number().min(0).max(100),
     pitchDataQuality: z.enum(["insufficient", "limited", "good"]),
+    pitchMoments: z.array(z.object({
+      id: z.string(),
+      firstSeenAt: z.number(),
+      lastSeenAt: z.number(),
+      startOffsetSeconds: z.number().min(0),
+      endOffsetSeconds: z.number().min(0),
+      totalDurationSeconds: z.number().min(0),
+      averageAbsCents: z.number().min(0),
+      peakAbsCents: z.number().min(0),
+      noteName: z.string().optional(),
+      direction: z.enum(["sharp", "flat", "mixed"]),
+    })).optional(),
   }).optional(),
 });
 

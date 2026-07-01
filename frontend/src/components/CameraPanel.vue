@@ -7,15 +7,8 @@ import {
   watch,
 } from "vue";
 import { ChevronUpIcon } from "@heroicons/vue/24/outline";
-import * as tf from "@tensorflow/tfjs-core";
-import "@tensorflow/tfjs-backend-cpu";
-import "@tensorflow/tfjs-backend-webgl";
-import {
-  SupportedModels,
-  createDetector,
-  type Keypoint,
-  type PoseDetector,
-} from "@tensorflow-models/pose-detection";
+import type { Keypoint, PoseDetector } from "@tensorflow-models/pose-detection";
+import type { Hand, HandDetector } from "@tensorflow-models/hand-pose-detection";
 import { useCamera } from "../composables/useCamera";
 import type { AnonymousPoseSnapshot } from "../types/session";
 
@@ -94,21 +87,54 @@ const ambientStatus = computed(() => {
   }
   return framingDetail.value;
 });
-const TARGET_DETECTION_INTERVAL_MS = 80;
-const MAX_DETECTION_INTERVAL_MS = 180;
+const TARGET_DETECTION_INTERVAL_MS = 55;
+const MAX_DETECTION_INTERVAL_MS = 140;
+const HAND_DETECTION_INTERVAL_MS = 320;
 const PROCESSING_WIDTH = 320;
 const PROCESSING_HEIGHT = 240;
 const MIN_KEYPOINT_SCORE = 0.42;
-const MAX_KEYPOINT_STEP = 30;
+const MIN_HAND_SCORE = 0.52;
+const MAX_KEYPOINT_STEP = 42;
+const MAX_TRACE_POINT_STEP = 54;
+const TRACE_RETENTION_MS = 620;
+const TRACE_MIN_POINTS = 3;
+const TRACE_ANCHOR_EASE = 0.68;
+type HandSignal = {
+  handedness: "Left" | "Right";
+  score: number;
+  center: { x: number; y: number };
+  radius: number;
+};
+type MotionTracePoint = {
+  x: number;
+  y: number;
+  confidence: number;
+  time: number;
+};
+type TfRuntime = typeof import("@tensorflow/tfjs-core");
+type PoseDetectionRuntime = typeof import("@tensorflow-models/pose-detection");
+type HandPoseRuntime = typeof import("@tensorflow-models/hand-pose-detection");
+type BodyTrackingRuntime = {
+  tf: TfRuntime;
+  pose: PoseDetectionRuntime;
+};
 let trackingTimer = 0;
 let renderFrame = 0;
 let lastVideoTime = -1;
 let consecutiveTrackingErrors = 0;
+let consecutiveHandTrackingErrors = 0;
 let poseDetector: PoseDetector | null = null;
+let handDetector: HandDetector | null = null;
+let handTrackingAvailable = false;
+let handDetectionInFlight = false;
+let lastHandDetectionAt = 0;
 let targetPose: Keypoint[] | null = null;
 let renderedPose: Keypoint[] | null = null;
 let stablePose: Keypoint[] | null = null;
-let bowPathTrail: Array<{ x: number; y: number; confidence: number }> = [];
+let targetHands: HandSignal[] = [];
+let renderedHands: HandSignal[] = [];
+let motionTraceTrail: MotionTracePoint[] = [];
+let stableMotionAnchor: MotionTracePoint | null = null;
 let pendingCueKey = "";
 let pendingCueSince = 0;
 let activeCueKey = "";
@@ -119,9 +145,41 @@ let currentFramingIssue: {
   detail: string;
   confidence: number;
 } | null = null;
+let bodyTrackingRuntimePromise: Promise<BodyTrackingRuntime> | null = null;
+let handTrackingRuntimePromise: Promise<HandPoseRuntime> | null = null;
 const processingCanvas = document.createElement("canvas");
 processingCanvas.width = PROCESSING_WIDTH;
 processingCanvas.height = PROCESSING_HEIGHT;
+const handProcessingCanvas = document.createElement("canvas");
+handProcessingCanvas.width = PROCESSING_WIDTH;
+handProcessingCanvas.height = PROCESSING_HEIGHT;
+
+function loadBodyTrackingRuntime() {
+  if (!bodyTrackingRuntimePromise) {
+    bodyTrackingRuntimePromise = (async () => {
+      const [tfRuntime, poseRuntime] = await Promise.all([
+        import("@tensorflow/tfjs-core"),
+        import("@tensorflow-models/pose-detection"),
+      ]);
+      await Promise.all([
+        import("@tensorflow/tfjs-backend-webgl"),
+        import("@tensorflow/tfjs-backend-cpu"),
+      ]);
+      return {
+        tf: tfRuntime,
+        pose: poseRuntime,
+      };
+    })();
+  }
+  return bodyTrackingRuntimePromise;
+}
+
+function loadHandTrackingRuntime() {
+  if (!handTrackingRuntimePromise) {
+    handTrackingRuntimePromise = import("@tensorflow-models/hand-pose-detection");
+  }
+  return handTrackingRuntimePromise;
+}
 
 watch(
   () => cameraRequestId,
@@ -229,38 +287,258 @@ function createAnonymousSnapshot(landmarks: Keypoint[]): AnonymousPoseSnapshot {
   };
 }
 
-function drawLiveLabel(
+function getVideoProjection(video: HTMLVideoElement, displayWidth: number, displayHeight: number) {
+  const videoAspect = video.videoWidth / video.videoHeight;
+  const displayAspect = displayWidth / displayHeight;
+  const renderedWidth = displayAspect > videoAspect
+    ? displayWidth
+    : displayHeight * videoAspect;
+  const renderedHeight = displayAspect > videoAspect
+    ? displayWidth / videoAspect
+    : displayHeight;
+  return {
+    renderedWidth,
+    renderedHeight,
+    offsetX: (displayWidth - renderedWidth) / 2,
+    offsetY: (displayHeight - renderedHeight) / 2,
+  };
+}
+
+function mapProcessingPoint(
+  point: { x: number; y: number },
+  projection: ReturnType<typeof getVideoProjection>
+) {
+  return {
+    x: projection.offsetX + (point.x / PROCESSING_WIDTH) * projection.renderedWidth,
+    y: projection.offsetY + (point.y / PROCESSING_HEIGHT) * projection.renderedHeight,
+  };
+}
+
+function createHandSignals(hands: Hand[]): HandSignal[] {
+  return hands.flatMap((hand) => {
+    if ((hand.score ?? 0) < MIN_HAND_SCORE) return [];
+    const visiblePoints = hand.keypoints.filter((point) => (point.score ?? 1) >= 0.35);
+    if (visiblePoints.length < 9) return [];
+    const xs = visiblePoints.map((point) => point.x);
+    const ys = visiblePoints.map((point) => point.y);
+    const width = Math.max(...xs) - Math.min(...xs);
+    const height = Math.max(...ys) - Math.min(...ys);
+    const center = {
+      x: (Math.min(...xs) + Math.max(...xs)) / 2,
+      y: (Math.min(...ys) + Math.max(...ys)) / 2,
+    };
+    return [{
+      handedness: hand.handedness,
+      score: hand.score ?? 0,
+      center,
+      radius: clamp(Math.max(width, height) / 2, 12, 44),
+    }];
+  });
+}
+
+function drawCaptureLabel(
   ctx: CanvasRenderingContext2D,
   text: string,
   x: number,
   y: number,
-  tone: "lime" | "amber" | "purple" = "lime"
+  tone: "lime" | "amber" | "lavender" = "lime"
 ) {
-  const color =
-    tone === "amber"
-      ? "rgba(252, 211, 77, 0.9)"
-      : tone === "purple"
-        ? "rgba(196, 181, 253, 0.9)"
-        : "rgba(190, 242, 100, 0.9)";
+  const colors = {
+    lime: "rgba(190, 242, 100, 0.92)",
+    amber: "rgba(252, 211, 77, 0.94)",
+    lavender: "rgba(196, 181, 253, 0.92)",
+  };
   ctx.save();
-  ctx.font = "600 11px Avenir Next, Segoe UI, sans-serif";
+  ctx.font = "700 11px Avenir Next, Segoe UI, sans-serif";
   ctx.textBaseline = "middle";
-  const metrics = ctx.measureText(text);
-  const width = metrics.width + 14;
-  ctx.fillStyle = "rgba(18, 16, 22, 0.68)";
-  ctx.strokeStyle = "rgba(255, 255, 255, 0.12)";
+  const width = ctx.measureText(text).width + 18;
+  ctx.fillStyle = "rgba(18, 16, 22, 0.66)";
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.13)";
   ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.roundRect(x, y - 11, width, 22, 11);
+  ctx.roundRect(x, y - 12, width, 24, 12);
   ctx.fill();
   ctx.stroke();
-  ctx.fillStyle = color;
-  ctx.fillText(text, x + 7, y);
+  ctx.fillStyle = colors[tone];
+  ctx.fillText(text, x + 9, y);
   ctx.restore();
 }
 
-function angleBetween(a: { x: number; y: number }, b: { x: number; y: number }) {
-  return Math.atan2(b.y - a.y, b.x - a.x);
+function chooseMotionAnchor(points: Map<number, { x: number; y: number; score: number }>) {
+  const candidates = [points.get(10), points.get(9)].flatMap((point) => point ? [point] : []);
+  if (!candidates.length) return null;
+  return candidates.sort((a, b) => b.score - a.score)[0];
+}
+
+function drawMotionTrace(
+  ctx: CanvasRenderingContext2D,
+  anchor: { x: number; y: number; score: number } | null,
+  tone: "good" | "adjust",
+  displayWidth: number
+) {
+  const now = performance.now();
+  if (anchor && anchor.score >= MIN_KEYPOINT_SCORE) {
+    const anchorStep = stableMotionAnchor
+      ? Math.hypot(anchor.x - stableMotionAnchor.x, anchor.y - stableMotionAnchor.y)
+      : 0;
+    if (!stableMotionAnchor || anchorStep > MAX_TRACE_POINT_STEP * 1.8) {
+      stableMotionAnchor = { x: anchor.x, y: anchor.y, confidence: anchor.score, time: now };
+      motionTraceTrail = [];
+    } else {
+      const ease = anchorStep > 18 ? TRACE_ANCHOR_EASE : 0.46;
+      stableMotionAnchor = {
+        x: stableMotionAnchor.x + (anchor.x - stableMotionAnchor.x) * ease,
+        y: stableMotionAnchor.y + (anchor.y - stableMotionAnchor.y) * ease,
+        confidence: anchor.score,
+        time: now,
+      };
+    }
+
+    const last = motionTraceTrail.at(-1);
+    const step = last && stableMotionAnchor
+      ? Math.hypot(stableMotionAnchor.x - last.x, stableMotionAnchor.y - last.y)
+      : 0;
+    if (stableMotionAnchor && (!last || step > 2.4 || now - last.time > 95)) {
+      motionTraceTrail = [
+        ...motionTraceTrail.slice(-5),
+        stableMotionAnchor,
+      ];
+    }
+  } else if (stableMotionAnchor && now - stableMotionAnchor.time > 260) {
+    stableMotionAnchor = null;
+  }
+  motionTraceTrail = motionTraceTrail.filter((point) => now - point.time < TRACE_RETENTION_MS).slice(-6);
+  if (motionTraceTrail.length < TRACE_MIN_POINTS) return;
+
+  const isAdjust = tone === "adjust";
+  const stroke = isAdjust ? "252, 211, 77" : "190, 242, 100";
+  const xs = motionTraceTrail.map((point) => point.x);
+  const ys = motionTraceTrail.map((point) => point.y);
+  const bounds = {
+    left: Math.min(...xs),
+    right: Math.max(...xs),
+    top: Math.min(...ys),
+    bottom: Math.max(...ys),
+  };
+  const hasEnoughMotion = Math.hypot(bounds.right - bounds.left, bounds.bottom - bounds.top) > 18;
+  ctx.save();
+  ctx.shadowColor = `rgba(${stroke}, ${isAdjust ? 0.38 : 0.32})`;
+  ctx.shadowBlur = 10;
+  ctx.lineWidth = isAdjust ? 2.8 : 2.2;
+  ctx.strokeStyle = `rgba(${stroke}, ${isAdjust ? 0.68 : 0.56})`;
+  ctx.beginPath();
+  motionTraceTrail.forEach((point, index) => {
+    if (index === 0) {
+      ctx.moveTo(point.x, point.y);
+      return;
+    }
+    const previous = motionTraceTrail[index - 1];
+    const cx = (previous.x + point.x) / 2;
+    const cy = (previous.y + point.y) / 2;
+    ctx.quadraticCurveTo(previous.x, previous.y, cx, cy);
+  });
+  ctx.stroke();
+
+  motionTraceTrail.forEach((point, index) => {
+    const age = index / Math.max(1, motionTraceTrail.length - 1);
+    const radius = 1.6 + age * 3.4;
+    ctx.beginPath();
+    ctx.fillStyle = `rgba(${stroke}, ${0.1 + age * 0.58})`;
+    ctx.arc(point.x, point.y, radius, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  const latest = motionTraceTrail.at(-1);
+  if (latest) {
+    const previous = motionTraceTrail.at(-2);
+    if (previous && hasEnoughMotion) {
+      const angle = Math.atan2(latest.y - previous.y, latest.x - previous.x);
+      const guideLength = 34;
+      ctx.save();
+      ctx.shadowBlur = 8;
+      ctx.strokeStyle = `rgba(${stroke}, 0.36)`;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(latest.x - Math.cos(angle) * guideLength * 0.45, latest.y - Math.sin(angle) * guideLength * 0.45);
+      ctx.lineTo(latest.x + Math.cos(angle) * guideLength, latest.y + Math.sin(angle) * guideLength);
+      ctx.stroke();
+      ctx.restore();
+    }
+    ctx.beginPath();
+    ctx.fillStyle = "rgba(18, 16, 22, 0.74)";
+    ctx.arc(latest.x, latest.y, 7.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = `rgba(${stroke}, 0.95)`;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.lineWidth = 1.2;
+    ctx.strokeStyle = `rgba(${stroke}, 0.42)`;
+    ctx.arc(latest.x, latest.y, 14, 0.1 * Math.PI, 1.65 * Math.PI);
+    ctx.stroke();
+
+    const labelX = Math.min(displayWidth - 150, latest.x + 14);
+    drawCaptureLabel(
+      ctx,
+      isAdjust ? "Adjust view" : hasEnoughMotion ? "Motion trace" : "Holding steady",
+      labelX,
+      latest.y + 4,
+      isAdjust ? "amber" : "lime",
+    );
+  }
+  ctx.restore();
+}
+
+function drawHandSignals(
+  ctx: CanvasRenderingContext2D,
+  hands: HandSignal[],
+  projection: ReturnType<typeof getVideoProjection>,
+  wristAnchors: Array<{ x: number; y: number; score: number }>
+) {
+  const shouldShowQuietSignal =
+    showGuideOverlay && (Boolean(currentFramingIssue) || showStatusDetail.value || isPracticeActive || isPlaying);
+  if (!shouldShowQuietSignal) return;
+
+  if (hands.length) {
+    hands.slice(0, 2).forEach((hand) => {
+      const center = mapProcessingPoint(hand.center, projection);
+      const radius = hand.radius * (projection.renderedWidth / PROCESSING_WIDTH);
+      const confidence = clamp(hand.score, 0.35, 1);
+      ctx.save();
+      ctx.shadowColor = currentFramingIssue
+        ? "rgba(252, 211, 77, 0.3)"
+        : "rgba(190, 242, 100, 0.24)";
+      ctx.shadowBlur = 18;
+      const quietAlpha = showStatusDetail.value ? 1 : 0.72;
+      ctx.fillStyle = currentFramingIssue
+        ? `rgba(252, 211, 77, ${(0.04 + confidence * 0.035) * quietAlpha})`
+        : `rgba(190, 242, 100, ${(0.035 + confidence * 0.035) * quietAlpha})`;
+      ctx.strokeStyle = currentFramingIssue
+        ? `rgba(252, 211, 77, ${(0.22 + confidence * 0.18) * quietAlpha})`
+        : `rgba(190, 242, 100, ${(0.2 + confidence * 0.18) * quietAlpha})`;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.ellipse(center.x, center.y, radius * 0.72, radius * 0.58, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    });
+    return;
+  }
+
+  wristAnchors.forEach((anchor) => {
+    ctx.save();
+    ctx.shadowColor = "rgba(252, 211, 77, 0.32)";
+    ctx.shadowBlur = 14;
+    ctx.strokeStyle = currentFramingIssue ? "rgba(252, 211, 77, 0.5)" : "rgba(190, 242, 100, 0.44)";
+    ctx.fillStyle = currentFramingIssue ? "rgba(252, 211, 77, 0.055)" : "rgba(190, 242, 100, 0.05)";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(anchor.x, anchor.y, currentFramingIssue ? 16 : 9, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  });
 }
 
 function drawPose(landmarks: Keypoint[]) {
@@ -274,20 +552,8 @@ function drawPose(landmarks: Keypoint[]) {
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
 
-  const videoAspect = video.videoWidth / video.videoHeight;
-  const displayAspect = displayWidth / displayHeight;
-  const renderedWidth = displayAspect > videoAspect
-    ? displayWidth
-    : displayHeight * videoAspect;
-  const renderedHeight = displayAspect > videoAspect
-    ? displayWidth / videoAspect
-    : displayHeight;
-  const offsetX = (displayWidth - renderedWidth) / 2;
-  const offsetY = (displayHeight - renderedHeight) / 2;
-  const pointAt = (landmark: Keypoint) => ({
-    x: offsetX + (landmark.x / PROCESSING_WIDTH) * renderedWidth,
-    y: offsetY + (landmark.y / PROCESSING_HEIGHT) * renderedHeight,
-  });
+  const projection = getVideoProjection(video, displayWidth, displayHeight);
+  const pointAt = (landmark: Keypoint) => mapProcessingPoint(landmark, projection);
   const pointMap = new Map<number, { x: number; y: number; score: number }>();
   [5, 6, 7, 8, 9, 10].forEach((index) => {
     const landmark = landmarks[index];
@@ -296,91 +562,64 @@ function drawPose(landmarks: Keypoint[]) {
     pointMap.set(index, { ...point, score: landmark.score ?? 0 });
   });
 
-  const liveConnections = [
-    [5, 6],
-    [5, 7],
-    [7, 9],
-    [6, 8],
-    [8, 10],
-  ] as const;
-  for (const [startId, endId] of liveConnections) {
-    const start = pointMap.get(startId);
-    const end = pointMap.get(endId);
-    if (!start || !end) continue;
-    const confidence = clamp(Math.min(start.score, end.score), 0.25, 1);
-    ctx.beginPath();
-    ctx.moveTo(start.x, start.y);
-    ctx.lineTo(end.x, end.y);
-    ctx.lineWidth = 2 + confidence * 2;
-    ctx.strokeStyle = currentFramingIssue
-      ? `rgba(252, 211, 77, ${0.25 + confidence * 0.45})`
-      : `rgba(190, 242, 100, ${0.25 + confidence * 0.5})`;
-    ctx.stroke();
+  const shouldDrawGuidance =
+    showGuideOverlay && (Boolean(currentFramingIssue) || showStatusDetail.value || isPracticeActive || isPlaying);
+  const quietGuidanceAlpha = showStatusDetail.value || currentFramingIssue ? 1 : 0.72;
+  const traceAnchor = chooseMotionAnchor(pointMap);
+  if (shouldDrawGuidance) {
+    drawMotionTrace(
+      ctx,
+      traceAnchor,
+      currentFramingIssue ? "adjust" : "good",
+      displayWidth,
+    );
   }
 
-  const leftWrist = pointMap.get(9);
-  const rightWrist = pointMap.get(10);
-  if (leftWrist && rightWrist) {
-    const midpoint = {
-      x: (leftWrist.x + rightWrist.x) / 2,
-      y: (leftWrist.y + rightWrist.y) / 2,
-      confidence: Math.min(leftWrist.score, rightWrist.score),
-    };
-    bowPathTrail = [...bowPathTrail.slice(-17), midpoint];
-    if (bowPathTrail.length > 1) {
+  if (shouldDrawGuidance) {
+    [9, 10].forEach((index) => {
+      const landmark = landmarks[index];
+      if (!landmark || (landmark.score ?? 0) < MIN_KEYPOINT_SCORE) return;
+      const point = pointAt(landmark);
       ctx.beginPath();
-      bowPathTrail.forEach((point, index) => {
-        if (index === 0) ctx.moveTo(point.x, point.y);
-        else ctx.lineTo(point.x, point.y);
-      });
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = "rgba(249, 115, 22, 0.58)";
+      ctx.arc(point.x, point.y, 4.5, 0, Math.PI * 2);
+      ctx.shadowBlur = 8;
+      ctx.shadowColor = currentFramingIssue
+        ? "rgba(252, 211, 77, 0.35)"
+        : "rgba(190, 242, 100, 0.3)";
+      ctx.fillStyle = showStatusDetail.value || currentFramingIssue
+        ? "rgba(32, 29, 40, 0.48)"
+        : "rgba(32, 29, 40, 0.34)";
+      ctx.fill();
+      ctx.lineWidth = 1.25;
+      ctx.strokeStyle = currentFramingIssue
+        ? "rgba(252, 211, 77, 0.58)"
+        : `rgba(190, 242, 100, ${0.54 * quietGuidanceAlpha})`;
       ctx.stroke();
-      drawLiveLabel(ctx, "bow path signal", midpoint.x + 12, midpoint.y - 18, "amber");
+    });
+    const statusLabel = currentFramingIssue
+      ? currentFramingIssue.title
+      : renderedHands.length
+        ? "LIVE hand capture"
+        : "LIVE motion capture";
+    if (!hideAmbientStatus) {
+      drawCaptureLabel(
+        ctx,
+        statusLabel,
+        18,
+        28,
+        currentFramingIssue ? "amber" : renderedHands.length ? "lime" : "lavender",
+      );
     }
   } else {
-    bowPathTrail = bowPathTrail.slice(-8);
+    motionTraceTrail = motionTraceTrail.slice(-3);
+    stableMotionAnchor = null;
   }
-
-  const bowArmElbow = pointMap.get(8) ?? pointMap.get(7);
-  const bowArmWrist = pointMap.get(10) ?? pointMap.get(9);
-  if (bowArmElbow && bowArmWrist) {
-    const wristAngle = Math.round(
-      Math.abs(angleBetween(bowArmElbow, bowArmWrist) * (180 / Math.PI))
-    );
-    ctx.beginPath();
-    ctx.arc(bowArmWrist.x, bowArmWrist.y, 24, -0.35 * Math.PI, 0.2 * Math.PI);
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = currentFramingIssue
-      ? "rgba(252, 211, 77, 0.75)"
-      : "rgba(196, 181, 253, 0.75)";
-    ctx.stroke();
-    drawLiveLabel(ctx, `wrist angle ~${wristAngle}deg`, bowArmWrist.x + 12, bowArmWrist.y + 28, "purple");
-  }
-
-  [7, 8, 9, 10].forEach((index) => {
-    const landmark = landmarks[index];
-    if (!landmark || (landmark.score ?? 0) < MIN_KEYPOINT_SCORE) return;
-    const point = pointAt(landmark);
-    const isHand = index === 9 || index === 10;
-    ctx.beginPath();
-    ctx.arc(point.x, point.y, isHand ? 7 : 4, 0, Math.PI * 2);
-    ctx.shadowBlur = isHand ? 10 : 4;
-    ctx.shadowColor = currentFramingIssue
-      ? "rgba(252, 211, 77, 0.45)"
-      : "rgba(190, 242, 100, 0.45)";
-    ctx.fillStyle = "rgba(32, 29, 40, 0.72)";
-    ctx.fill();
-    ctx.lineWidth = isHand ? 2 : 1.5;
-    ctx.strokeStyle = currentFramingIssue
-      ? "rgba(252, 211, 77, 0.82)"
-      : "rgba(190, 242, 100, 0.78)";
-    ctx.stroke();
-  });
-  const shoulder = pointMap.get(5) ?? pointMap.get(6);
-  if (shoulder) {
-    drawLiveLabel(ctx, "local pose signals", shoulder.x + 14, shoulder.y - 28);
-  }
+  drawHandSignals(
+    ctx,
+    renderedHands,
+    projection,
+    [pointMap.get(9), pointMap.get(10)].flatMap((point) => point ? [point] : [])
+  );
   ctx.restore();
 }
 
@@ -626,8 +865,8 @@ function updateRenderedPose() {
         const distance = Math.hypot(target.x - current.x, target.y - current.y);
         const isHand = index === 9 || index === 10;
         const positionEase = isHand
-          ? distance > 20 ? 0.62 : 0.42
-          : distance > 30 ? 0.48 : distance > 12 ? 0.3 : 0.2;
+          ? distance > 20 ? 0.82 : 0.62
+          : distance > 30 ? 0.58 : distance > 12 ? 0.38 : 0.26;
         return {
           ...target,
           x: current.x + (target.x - current.x) * positionEase,
@@ -638,10 +877,29 @@ function updateRenderedPose() {
         };
       });
     }
+    if (targetHands.length) {
+      renderedHands = targetHands.map((target, index) => {
+        const current = renderedHands[index];
+        if (!current) return target;
+        const ease = 0.5;
+        return {
+          ...target,
+          center: {
+            x: current.center.x + (target.center.x - current.center.x) * ease,
+            y: current.center.y + (target.center.y - current.center.y) * ease,
+          },
+          radius: current.radius + (target.radius - current.radius) * ease,
+        };
+      });
+    } else {
+      renderedHands = [];
+    }
     drawPose(renderedPose);
   } else {
     const drawing = resizeDrawingCanvas();
     drawing?.ctx.clearRect(0, 0, drawing.displayWidth, drawing.displayHeight);
+    motionTraceTrail = [];
+    stableMotionAnchor = null;
   }
   renderFrame = window.requestAnimationFrame(updateRenderedPose);
 }
@@ -657,7 +915,13 @@ function stopRenderLoop() {
   targetPose = null;
   renderedPose = null;
   stablePose = null;
-  bowPathTrail = [];
+  targetHands = [];
+  renderedHands = [];
+  motionTraceTrail = [];
+  stableMotionAnchor = null;
+  handDetectionInFlight = false;
+  lastHandDetectionAt = 0;
+  consecutiveHandTrackingErrors = 0;
   currentFramingIssue = null;
   visibilityStatus.value = "Waiting for a clear body view";
   pendingCueKey = "";
@@ -672,7 +936,8 @@ function stopRenderLoop() {
 
 async function initDynamicTracking() {
   try {
-    trackingStatus.value = "Loading TensorFlow.js body tracking...";
+    trackingStatus.value = "Loading local movement tracking...";
+    const { tf, pose } = await loadBodyTrackingRuntime();
     try {
       const webglReady = await tf.setBackend("webgl");
       if (!webglReady) throw new Error("WebGL backend is unavailable.");
@@ -680,7 +945,7 @@ async function initDynamicTracking() {
       await tf.setBackend("cpu");
     }
     await tf.ready();
-    poseDetector = await createDetector(SupportedModels.PoseNet, {
+    poseDetector = await pose.createDetector(pose.SupportedModels.PoseNet, {
       architecture: "MobileNetV1",
       outputStride: 16,
       inputResolution: { width: 257, height: 257 },
@@ -693,13 +958,38 @@ async function initDynamicTracking() {
     trackingStatus.value = `Body tracking is ready (${tf.getBackend().toUpperCase()}).`;
     lastVideoTime = -1;
     consecutiveTrackingErrors = 0;
+    consecutiveHandTrackingErrors = 0;
+    void initHandDetailTracking(tf);
   } catch (error) {
     poseDetector?.dispose();
+    handDetector?.dispose();
     poseDetector = null;
+    handDetector = null;
+    handTrackingAvailable = false;
     detectorReady.value = false;
     trackingError.value =
       "Could not load TensorFlow.js body tracking. Reload and try again.";
     console.error(error);
+  }
+}
+
+async function initHandDetailTracking(tf: TfRuntime) {
+  if (!poseDetector || handDetector || handTrackingAvailable) return;
+  try {
+    const hands = await loadHandTrackingRuntime();
+    if (!poseDetector) return;
+    handDetector = await hands.createDetector(hands.SupportedModels.MediaPipeHands, {
+      runtime: "tfjs",
+      modelType: "lite",
+      maxHands: 2,
+    });
+    handTrackingAvailable = true;
+    trackingStatus.value = `Body and hand detail tracking are ready (${tf.getBackend().toUpperCase()}).`;
+  } catch (handError) {
+    handDetector?.dispose();
+    handDetector = null;
+    handTrackingAvailable = false;
+    console.warn("Hand detail tracking unavailable:", handError);
   }
 }
 
@@ -708,6 +998,40 @@ function scheduleTracking(delay = TARGET_DETECTION_INTERVAL_MS) {
   trackingTimer = window.setTimeout(() => {
     void runTracking();
   }, delay);
+}
+
+function scheduleHandDetection() {
+  if (
+    !handDetector ||
+    !handTrackingAvailable ||
+    handDetectionInFlight ||
+    performance.now() - lastHandDetectionAt < HAND_DETECTION_INTERVAL_MS
+  ) {
+    return;
+  }
+  const handContext = handProcessingCanvas.getContext("2d", { alpha: false });
+  if (!handContext) return;
+
+  handContext.drawImage(processingCanvas, 0, 0);
+  lastHandDetectionAt = performance.now();
+  handDetectionInFlight = true;
+  void handDetector.estimateHands(handProcessingCanvas, {
+    flipHorizontal: false,
+    staticImageMode: false,
+  }).then((hands) => {
+    targetHands = createHandSignals(hands);
+    consecutiveHandTrackingErrors = 0;
+  }).catch((handError) => {
+    consecutiveHandTrackingErrors += 1;
+    targetHands = [];
+    console.warn("Hand tracking frame error:", handError);
+    if (consecutiveHandTrackingErrors >= 4) {
+      handTrackingAvailable = false;
+      visibilityStatus.value = "Body view visible";
+    }
+  }).finally(() => {
+    handDetectionInFlight = false;
+  });
 }
 
 async function runTracking() {
@@ -747,11 +1071,18 @@ async function runTracking() {
     const landmarks = result[0]?.keypoints;
     if (landmarks?.length) {
       targetPose = stabilizePose(landmarks);
+      scheduleHandDetection();
       updateTrackingGuidance(targetPose);
       updatePracticeCue(targetPose);
-      trackingStatus.value = "Tracking local movement signals in real time.";
+      if (framingTone.value === "good" && handTrackingAvailable && targetHands.length) {
+        visibilityStatus.value = "Hands, fingers, and upper body visible";
+      }
+      trackingStatus.value = handTrackingAvailable
+        ? "Tracking local body and hand signals in real time."
+        : "Tracking local movement signals in real time.";
     } else {
       targetPose = null;
+      targetHands = [];
       framingTone.value = "searching";
       framingTitle.value = "No body detected";
       framingDetail.value = "Stand facing the camera with your upper body visible.";
@@ -791,6 +1122,7 @@ watch(
       if (!dynamicEnabled) trackingError.value = "";
       lastVideoTime = -1;
       consecutiveTrackingErrors = 0;
+      consecutiveHandTrackingErrors = 0;
       const canvas = canvasRef.value;
       const ctx = canvas?.getContext("2d");
       if (canvas && ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -811,7 +1143,10 @@ onBeforeUnmount(() => {
   window.clearTimeout(trackingTimer);
   stopRenderLoop();
   poseDetector?.dispose();
+  handDetector?.dispose();
   poseDetector = null;
+  handDetector = null;
+  handTrackingAvailable = false;
 });
 </script>
 

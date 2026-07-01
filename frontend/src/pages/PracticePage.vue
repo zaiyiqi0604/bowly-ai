@@ -23,6 +23,7 @@ import { usePracticeStore } from "../stores/practice";
 import type {
   AnonymousPoseSnapshot,
   PracticeActivityStats,
+  PitchEvidenceMoment,
   PracticeReviewMoment,
 } from "../types/session";
 
@@ -112,6 +113,16 @@ const activeObservationStarts = new Map<string, number>();
 const lastObservationFeedbackAt = new Map<string, number>();
 let lastFlowSampleAt = 0;
 let currentPhraseStartedAt = 0;
+const CENTERED_CENTS_THRESHOLD = 20;
+let activePitchMoment: {
+  startedAt: number;
+  lastSeenAt: number;
+  noteName?: string;
+  samples: number;
+  absCentsTotal: number;
+  peakAbsCents: number;
+  direction: "sharp" | "flat" | "mixed";
+} | null = null;
 
 function logFeedbackDebug(
   type: FeedbackDebugEntry["type"],
@@ -140,7 +151,62 @@ function createEmptyActivity(): PracticeActivityStats {
     inTunePercent: 0,
     stablePitchPercent: 0,
     pitchDataQuality: "insufficient",
+    pitchMoments: [],
   };
+}
+
+function sessionOffsetSeconds(timestamp: number) {
+  return Math.max(0, Math.round((timestamp - practiceStore.sessionStartedAt) / 1000));
+}
+
+function closeActivePitchMoment() {
+  if (!activePitchMoment) return;
+  const durationSeconds = Math.max(0, Math.round((activePitchMoment.lastSeenAt - activePitchMoment.startedAt) / 1000));
+  if (durationSeconds >= 3 && activePitchMoment.samples >= 3) {
+    const moment: PitchEvidenceMoment = {
+      id: crypto.randomUUID(),
+      firstSeenAt: activePitchMoment.startedAt,
+      lastSeenAt: activePitchMoment.lastSeenAt,
+      startOffsetSeconds: sessionOffsetSeconds(activePitchMoment.startedAt),
+      endOffsetSeconds: sessionOffsetSeconds(activePitchMoment.lastSeenAt),
+      totalDurationSeconds: durationSeconds,
+      averageAbsCents: Math.round(activePitchMoment.absCentsTotal / activePitchMoment.samples),
+      peakAbsCents: Math.round(activePitchMoment.peakAbsCents),
+      noteName: activePitchMoment.noteName,
+      direction: activePitchMoment.direction,
+    };
+    activity.value.pitchMoments = [...(activity.value.pitchMoments ?? []), moment].slice(-5);
+  }
+  activePitchMoment = null;
+}
+
+function trackPitchEvidence(now: number, sampleSeconds: number) {
+  if (!practiceStore.isSessionActive || !noteName.value || sampleSeconds <= 0) return;
+  const absCents = Math.abs(centsOffset.value);
+  const isPitchIssue = hasReliablePitch.value && absCents >= 28;
+  if (!isPitchIssue) {
+    closeActivePitchMoment();
+    return;
+  }
+
+  const direction = centsOffset.value > 0 ? "sharp" : "flat";
+  if (!activePitchMoment) {
+    activePitchMoment = {
+      startedAt: now,
+      lastSeenAt: now,
+      noteName: noteName.value,
+      samples: 0,
+      absCentsTotal: 0,
+      peakAbsCents: 0,
+      direction,
+    };
+  }
+  activePitchMoment.lastSeenAt = now;
+  activePitchMoment.noteName = activePitchMoment.noteName ?? noteName.value;
+  activePitchMoment.samples += 1;
+  activePitchMoment.absCentsTotal += absCents;
+  activePitchMoment.peakAbsCents = Math.max(activePitchMoment.peakAbsCents, absCents);
+  if (activePitchMoment.direction !== direction) activePitchMoment.direction = "mixed";
 }
 
 function updateActivityPercentages() {
@@ -210,22 +276,6 @@ function beginSession() {
   logFeedbackDebug("flow", "Session started. Waiting for a clear playing phrase.");
 }
 
-function waitForCameraCheck(timeoutMs = 3500) {
-  return new Promise<void>((resolve) => {
-    const startedAt = Date.now();
-    const timer = window.setInterval(() => {
-      if (
-        cameraStatus.value.framing === "good" ||
-        cameraStatus.value.permission === "denied" ||
-        Date.now() - startedAt >= timeoutMs
-      ) {
-        window.clearInterval(timer);
-        resolve();
-      }
-    }, 120);
-  });
-}
-
 async function startPractice() {
   if (startState.value === "preparing") return;
   startState.value = "preparing";
@@ -242,45 +292,17 @@ async function startPractice() {
     startIssue.value = "Microphone access is needed to listen to the practice.";
     return;
   }
-  if (calibrationState.value !== "ready") {
-    const calibrated = await calibrateNoise();
-    if (!calibrated) {
-      cameraEnabled.value = false;
-      stopMicrophone();
-      startState.value = "blocked";
-      startIssue.value = "The microphone could not measure the room sound.";
-      return;
-    }
-  }
-
-  await waitForCameraCheck();
-  if (cameraStatus.value.permission === "denied") {
-    cameraEnabled.value = false;
-    startState.value = "blocked";
-    startIssue.value = "Camera access is unavailable. You can continue with audio only.";
-    allowAudioOnly.value = true;
-    return;
-  }
-  if (cameraStatus.value.framing !== "good") {
-    if (window.matchMedia("(max-width: 767px)").matches) {
-      startState.value = "idle";
-      startIssue.value = "";
-      allowStartAnyway.value = false;
-      beginSession();
-      showMicroFeedback("Partial view active. Only clearly visible movement will be assessed.");
-      return;
-    }
-    startState.value = "blocked";
-    startIssue.value =
-      cameraStatus.value.message ||
-      "Keep your upper body and both hands inside the camera view.";
-    allowStartAnyway.value = true;
-    stopMicrophone();
-    return;
-  }
 
   startState.value = "idle";
   beginSession();
+
+  if (calibrationState.value !== "ready") {
+    void calibrateNoise().then((calibrated) => {
+      if (!calibrated && practiceStore.isSessionActive) {
+        showMicroFeedback("Microphone setup is still settling. Keep playing while Bowly listens.");
+      }
+    });
+  }
 }
 
 function startAudioOnly() {
@@ -430,13 +452,14 @@ function monitorPracticeFlow() {
     activity.value.totalPlayingSeconds += sampleSeconds;
     if (noteName.value) {
       activity.value.pitchedSeconds += sampleSeconds;
-      if (Math.abs(centsOffset.value) <= 20) {
+      if (Math.abs(centsOffset.value) <= CENTERED_CENTS_THRESHOLD) {
         activity.value.inTuneSeconds += sampleSeconds;
       }
       if (pitchStability.value >= 70) {
         activity.value.stablePitchSeconds += sampleSeconds;
       }
       updateActivityPercentages();
+      trackPitchEvidence(now, sampleSeconds);
     }
     lastSoundAt = now;
     heardPlayingSincePause = true;
@@ -456,6 +479,7 @@ function monitorPracticeFlow() {
     heardPlayingSincePause &&
     now - lastSoundAt >= 1200
   ) {
+    closeActivePitchMoment();
     isPlaying.value = false;
     heardPlayingSincePause = false;
     showPauseActions.value = true;
@@ -524,6 +548,7 @@ function showMicroFeedback(message: string) {
 
 function closeActiveObservations() {
   const now = Date.now();
+  closeActivePitchMoment();
   for (const [key, startedAt] of activeObservationStarts) {
     const moment = reviewMoments.value.find((item) => item.key === key);
     if (!moment) continue;
@@ -673,7 +698,7 @@ function closeActiveObservations() {
           </div>
 
           <PracticePet
-            class="absolute bottom-[6.1rem] left-4 z-20 md:left-6"
+            class="absolute bottom-[9.25rem] left-3 z-50 md:bottom-[6.1rem] md:left-6 md:z-20"
             :session-active="practiceStore.isSessionActive"
             :is-playing="isPlaying"
             :pitch-stability="pitchStability"
@@ -793,15 +818,7 @@ function closeActiveObservations() {
       </div>
 
       <aside class="divide-y divide-white/10 bg-[#201d28] max-md:hidden">
-        <template v-if="isPlaying">
-          <PracticeCoachPanel
-            :coach-message="coachMessage"
-            :loading-coach="loadingCoach"
-            :is-playing="true"
-            compact
-          />
-        </template>
-        <template v-else-if="!practiceStore.isSessionActive">
+        <template v-if="!practiceStore.isSessionActive">
           <PracticePlanCard
             :mode="practiceStore.practiceMode"
             :assignment-title="practiceStore.assignmentTitle"
@@ -827,7 +844,7 @@ function closeActiveObservations() {
           <PracticeCoachPanel
             :coach-message="coachMessage"
             :loading-coach="loadingCoach"
-            :is-playing="false"
+            :is-playing="isPlaying"
           />
           <PracticePlanCard
             :mode="practiceStore.practiceMode"
@@ -835,7 +852,7 @@ function closeActiveObservations() {
             :assignment-image="practiceStore.assignmentImage"
             :plan="practiceStore.activeChallenge"
             :is-session-active="true"
-            :is-playing="false"
+            :is-playing="isPlaying"
             :activity="activity"
             @mark-round="practiceStore.markPracticeRound"
             @complete="practiceStore.completePracticeGoal"

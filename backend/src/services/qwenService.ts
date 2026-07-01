@@ -125,6 +125,14 @@ export async function createQwenParentReport(
     occurrences: moment.occurrences,
     suggestion: moment.suggestion,
   }));
+  const pitchMoments = (activity?.pitchMoments ?? []).slice(-3).map((moment) => ({
+    around: `${moment.startOffsetSeconds}-${moment.endOffsetSeconds}s`,
+    seconds: moment.totalDurationSeconds,
+    averageAbsCents: moment.averageAbsCents,
+    peakAbsCents: moment.peakAbsCents,
+    noteName: moment.noteName,
+    direction: moment.direction,
+  }));
   const compactInput = {
     childName: payload.childName,
     durationSeconds: payload.durationSeconds,
@@ -136,6 +144,7 @@ export async function createQwenParentReport(
     longestContinuousSeconds: activity?.longestContinuousSeconds ?? 0,
     inTunePercent: activity?.pitchDataQuality === "good" ? activity.inTunePercent : null,
     pitchDataQuality: activity?.pitchDataQuality ?? "insufficient",
+    pitchMoments,
     reviewMoments,
   };
   return createStructuredResponse(

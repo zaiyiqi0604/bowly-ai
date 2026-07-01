@@ -10,7 +10,10 @@ export default defineConfig({
     rolldownOptions: {
       output: {
         manualChunks(id) {
-          if (id.includes('@tensorflow') || id.includes('pose-detection')) {
+          if (id.includes('@tensorflow-models/hand-pose-detection')) {
+            return 'hand-engine'
+          }
+          if (id.includes('@tensorflow') || id.includes('@tensorflow-models/pose-detection')) {
             return 'pose-engine'
           }
           if (id.includes('node_modules/vue') || id.includes('node_modules/pinia')) {
@@ -24,6 +27,9 @@ export default defineConfig({
     alias: {
       '@mediapipe/pose': fileURLToPath(
         new URL('./src/shims/mediapipe-pose.ts', import.meta.url),
+      ),
+      '@mediapipe/hands': fileURLToPath(
+        new URL('./src/shims/mediapipe-hands.ts', import.meta.url),
       ),
     },
   },

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import puppyImage from "../assets/practice-pets/puppy.webp";
 import puppyListeningImage from "../assets/practice-pets/puppy-listening.webp";
 import puppySteadyImage from "../assets/practice-pets/puppy-steady.webp";
@@ -35,6 +35,7 @@ type PetReaction = "sleepy" | "curious" | "listening" | "steady" | "concerned" |
 
 const PET_STORAGE_KEY = "bowly-practice-pet";
 const PET_MISSION_STORAGE_KEY = "bowly-practice-pet-mission";
+const SESSION_WAKE_SECONDS = 30;
 
 const pets: Array<{
   id: PetId;
@@ -102,26 +103,59 @@ function readPetMission() {
 }
 
 const awakenedPets = ref<Record<PetId, boolean>>(readPetMission());
-const selectedPetAwake = computed(() => awakenedPets.value[selectedPetId.value] === true);
+const sessionRevealedPetId = ref<PetId | null>(null);
+const selectedPetAwake = computed(() => sessionRevealedPetId.value === selectedPetId.value);
+const missionSeconds = computed(() =>
+  props.sessionActive
+    ? Math.max(props.playingSeconds, props.durationSeconds)
+    : props.playingSeconds,
+);
+const sessionWakeActive = computed(
+  () => props.sessionActive && missionSeconds.value < SESSION_WAKE_SECONDS,
+);
+const visualState = ref<PetVisualState>("ready");
+let visualStateTimer = 0;
+const VISUAL_STATE_HOLD_MS = 1400;
+
+onMounted(() => {
+  pets.flatMap((pet) => Object.values(pet.images)).forEach((src) => {
+    const image = new Image();
+    image.src = src;
+  });
+});
+
+onBeforeUnmount(() => {
+  window.clearTimeout(visualStateTimer);
+});
 
 watch(selectedPetId, (next) => {
   if (typeof window !== "undefined") window.localStorage.setItem(PET_STORAGE_KEY, next);
 });
 
 watch(
+  [selectedPetId, () => props.sessionActive],
+  ([nextPet, isActive], [previousPet, wasActive]) => {
+    if (nextPet !== previousPet || (!wasActive && isActive)) {
+      sessionRevealedPetId.value = null;
+    }
+  },
+);
+
+watch(
   () => [
     selectedPetId.value,
     props.sessionActive,
     props.playingSeconds,
+    props.durationSeconds,
     props.stablePlayingSeconds,
   ],
   () => {
     const readyToWake =
       props.sessionActive &&
-      props.playingSeconds >= 30 &&
-      (props.stablePlayingSeconds >= 6 || props.pitchStability >= 55);
+      missionSeconds.value >= SESSION_WAKE_SECONDS;
     if (!readyToWake || selectedPetAwake.value) return;
 
+    sessionRevealedPetId.value = selectedPetId.value;
     awakenedPets.value = {
       ...awakenedPets.value,
       [selectedPetId.value]: true,
@@ -133,10 +167,10 @@ watch(
 );
 
 const missionStage = computed<PetMissionStage>(() => {
-  if (!selectedPetAwake.value && props.playingSeconds < 8) return "egg";
+  if (sessionWakeActive.value || !selectedPetAwake.value) return "egg";
   if (props.sessionActive && props.stablePlayingSeconds >= 15) return "calm";
-  if (props.isPlaying || props.sessionActive || props.playingSeconds >= 8) return "listening";
-  return selectedPetAwake.value ? "calm" : "egg";
+  if (props.isPlaying || props.sessionActive || missionSeconds.value >= 8) return "listening";
+  return "calm";
 });
 
 const petState = computed(() => {
@@ -211,23 +245,43 @@ const petState = computed(() => {
   };
 });
 
+watch(
+  () => petState.value.visual as PetVisualState,
+  (nextVisual) => {
+    if (nextVisual === visualState.value) return;
+    window.clearTimeout(visualStateTimer);
+
+    if (nextVisual === "clearer" || visualState.value === "ready") {
+      visualState.value = nextVisual;
+      return;
+    }
+
+    visualStateTimer = window.setTimeout(() => {
+      visualState.value = nextVisual;
+    }, VISUAL_STATE_HOLD_MS);
+  },
+  { immediate: true },
+);
+
 const petToneClass = computed(() => `practice-pet--${petState.value.tone as PetTone}`);
 const selectedPetImage = computed(
-  () => selectedPet.value.images[petState.value.visual as PetVisualState],
+  () => selectedPet.value.images[visualState.value],
 );
 const habitatClass = computed(() => `practice-pet--${selectedPet.value.id}`);
-const habitatStateClass = computed(() => `practice-pet--${petState.value.visual as PetVisualState}`);
+const habitatStateClass = computed(() => `practice-pet--${visualState.value}`);
 const missionStageClass = computed(() => `practice-pet--mission-${missionStage.value}`);
 const missionProgress = computed(() => {
   if (missionStage.value === "calm") return 100;
   if (missionStage.value === "listening") {
-    return Math.min(96, Math.max(42, 42 + props.stablePlayingSeconds * 3.6));
+    return Math.min(96, Math.max(42, 42 + missionSeconds.value * 1.8));
   }
-  return Math.min(34, Math.max(12, 12 + props.playingSeconds * 2.6));
+  return Math.min(34, Math.max(12, 12 + missionSeconds.value * 2.6));
 });
-const wakeProgress = computed(() => Math.min(100, Math.round((props.playingSeconds / 30) * 100)));
+const wakeProgress = computed(() =>
+  Math.min(100, Math.round((missionSeconds.value / SESSION_WAKE_SECONDS) * 100)),
+);
 const wakeSecondsRemaining = computed(() =>
-  Math.max(0, 30 - Math.floor(props.playingSeconds)),
+  Math.max(0, Math.ceil(SESSION_WAKE_SECONDS - missionSeconds.value)),
 );
 const missionRingStyle = computed(() => ({
   "--pet-progress": `${missionProgress.value}%`,
@@ -281,7 +335,7 @@ const reactionLabel = computed(() => {
     <div class="practice-pet__wake-meter" :style="missionRingStyle" aria-hidden="true">
       <strong>{{ wakeSecondsRemaining }}</strong>
       <span>sec</span>
-      <em>music</em>
+      <em>practice</em>
     </div>
     <span class="practice-pet__glow"></span>
     <span class="practice-pet__shadow"></span>
@@ -561,6 +615,8 @@ const reactionLabel = computed(() => {
   display: none;
   width: 4.95rem;
   height: 4.95rem;
+  grid-template-rows: auto auto auto;
+  place-content: center;
   align-content: center;
   justify-items: center;
   border-radius: 999px;
@@ -587,12 +643,12 @@ const reactionLabel = computed(() => {
   color: white;
   font-size: 1.08rem;
   font-weight: 900;
-  line-height: 0.92;
+  line-height: 0.9;
 }
 
 .practice-pet__wake-meter span {
   display: block;
-  margin-top: 0.16rem;
+  margin-top: 0.12rem;
   color: rgba(255, 255, 255, 0.72);
   font-size: 0.52rem;
   font-weight: 800;
@@ -602,7 +658,7 @@ const reactionLabel = computed(() => {
 
 .practice-pet__wake-meter em {
   display: block;
-  margin-top: 0.24rem;
+  margin-top: 0.16rem;
   color: rgba(255, 255, 255, 0.54);
   font-size: 0.44rem;
   font-style: normal;
@@ -1165,13 +1221,13 @@ const reactionLabel = computed(() => {
 
 @media (max-width: 767px) {
   .practice-pet {
-    width: 13.8rem;
-    min-height: 7.75rem;
+    width: 12.6rem;
+    min-height: 7.2rem;
   }
 
   .practice-pet--mission-egg {
-    width: min(22.5rem, calc(100vw - 1.25rem));
-    min-height: 8.4rem;
+    width: min(20.5rem, calc(100vw - 1rem));
+    min-height: 7.6rem;
   }
 
   .practice-pet__avatar-wrap {
@@ -1183,8 +1239,8 @@ const reactionLabel = computed(() => {
   .practice-pet__habitat {
     left: -0.25rem;
     top: 1.05rem;
-    width: 8.35rem;
-    height: 6.3rem;
+    width: 7.85rem;
+    height: 5.8rem;
   }
 
   .practice-pet__habitat-back {
@@ -1207,23 +1263,23 @@ const reactionLabel = computed(() => {
   }
 
   .practice-pet__mission-orb {
-    left: 1.95rem;
+    left: 1.75rem;
     bottom: 1rem;
     width: 3.35rem;
     height: 3.75rem;
   }
 
   .practice-pet__egg {
-    left: -0.55rem;
-    bottom: 0.4rem;
-    width: 7.6rem;
-    height: 7.6rem;
+    left: -0.45rem;
+    bottom: 0.32rem;
+    width: 7.05rem;
+    height: 7.05rem;
   }
 
   .practice-pet__wake-copy {
-    left: 7.65rem;
-    top: 2.25rem;
-    min-width: 6.1rem;
+    left: 6.72rem;
+    top: 1.95rem;
+    min-width: 5.65rem;
   }
 
   .practice-pet__wake-copy strong {
@@ -1232,31 +1288,32 @@ const reactionLabel = computed(() => {
 
   .practice-pet__wake-copy small {
     font-size: 0.62rem;
+    max-width: 5.8rem;
   }
 
   .practice-pet__wake-meter {
-    left: 14.05rem;
+    left: 12.45rem;
     right: auto;
-    top: 1.68rem;
+    top: 1.42rem;
     width: 4.05rem;
     height: 4.05rem;
   }
 
   .practice-pet__wake-meter strong {
-    font-size: 0.92rem;
+    font-size: 1rem;
   }
 
   .practice-pet__wake-meter em {
-    display: none;
+    font-size: 0.4rem;
   }
 
   .practice-pet--mission-egg .practice-pet__habitat {
-    width: 13.2rem;
+    width: 12.15rem;
   }
 
   .practice-pet--mission-egg .practice-pet__habitat-back {
-    width: 7.8rem;
-    height: 3.15rem;
+    width: 7.1rem;
+    height: 2.95rem;
   }
 
   .practice-pet__mission-ring {

@@ -43,6 +43,15 @@ const emit = defineEmits<{
 const editingTask = ref(false);
 const draftTitle = ref(props.assignmentTitle);
 const hasRememberedTask = computed(() => Boolean(props.assignmentTitle.trim()));
+const pitchCenterValue = computed(() => {
+  if (props.activity.pitchDataQuality === "insufficient") return "Collecting";
+  return `${props.activity.inTunePercent}%`;
+});
+const pitchCenterDetail = computed(() => {
+  if (props.activity.pitchDataQuality === "insufficient") return "Clear notes";
+  if (props.activity.pitchDataQuality === "limited") return "Limited data";
+  return "Within +/-20c";
+});
 
 function openTaskEditor() {
   draftTitle.value = props.assignmentTitle;
@@ -213,14 +222,14 @@ function handleImage(event: Event) {
         </div>
       </div>
       <p v-else-if="startState === 'preparing'" class="mt-3 text-center text-xs text-white/40">
-        Checking microphone and camera...
+        Starting microphone and camera...
       </p>
     </template>
 
     <template v-else>
       <h3 class="flex items-center gap-3 text-lg font-semibold text-orange-300">
         <BookOpenIcon class="h-6 w-6" />
-        {{ mode === "assignment" ? "Today’s Practice" : "Free Practice" }}
+        {{ mode === "assignment" ? "Today's Practice" : "Free Practice" }}
       </h3>
 
       <div class="mt-5 rounded-2xl border border-white/10 bg-white/[0.035] p-4">
@@ -265,8 +274,9 @@ function handleImage(event: Event) {
           <p class="mt-1 text-[10px] uppercase tracking-wide text-white/30">Playing</p>
         </div>
         <div class="rounded-xl bg-white/[0.04] px-2 py-3">
-          <p class="text-lg font-semibold text-white/85">{{ activity.pitchedSeconds ? `${activity.inTunePercent}%` : "—" }}</p>
-          <p class="mt-1 text-[10px] uppercase tracking-wide text-white/30">Near centre</p>
+          <p class="text-lg font-semibold text-white/85">{{ pitchCenterValue }}</p>
+          <p class="mt-1 text-[10px] uppercase tracking-wide text-white/30">Pitch center</p>
+          <p class="mt-1 text-[10px] text-white/25">{{ pitchCenterDetail }}</p>
         </div>
       </div>
     </template>

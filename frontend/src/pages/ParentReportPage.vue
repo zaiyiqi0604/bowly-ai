@@ -29,6 +29,11 @@ const showProgressDetails = ref(false);
 const showObservationDetails = ref(false);
 const latestSession = computed(() => memoryStore.latestSession);
 const activity = computed(() => latestSession.value?.activity);
+const pitchEvidenceMoments = computed(() =>
+  [...(activity.value?.pitchMoments ?? [])]
+    .sort((a, b) => b.totalDurationSeconds - a.totalDurationSeconds)
+    .slice(0, 3),
+);
 const continuityInsight = computed(() => {
   const durations = activity.value?.phraseDurationsSeconds ?? [];
   if (durations.length < 4) return "A few more playing sections will make this trend more reliable.";
@@ -69,6 +74,17 @@ function shortInstruction(value: string) {
   const sentence = value.split(/[.!?]/)[0]?.trim() || value.trim();
   const words = sentence.split(/\s+/);
   return words.length > 14 ? `${words.slice(0, 14).join(" ")}.` : `${sentence}.`;
+}
+function formatSessionOffset(seconds: number) {
+  const safeSeconds = Math.max(0, Math.round(seconds));
+  const minutes = Math.floor(safeSeconds / 60);
+  const remainder = safeSeconds % 60;
+  return `${minutes}:${remainder.toString().padStart(2, "0")}`;
+}
+function pitchDirectionLabel(direction: "sharp" | "flat" | "mixed") {
+  if (direction === "sharp") return "mostly sharp";
+  if (direction === "flat") return "mostly flat";
+  return "moving sharp and flat";
 }
 const focusText = computed(() => {
   if (postureMoments.value[0]) return shortInstruction(postureMoments.value[0].suggestion);
@@ -395,11 +411,11 @@ const reportMetricStats = computed(() => [
     icon: PlayCircleIcon,
   },
   {
-    label: "Near note",
+    label: "Pitch center",
     value: (activity.value?.pitchedSeconds ?? 0) >= 12 ? `${activity.value?.inTunePercent}%` : "--",
     detail:
       (activity.value?.pitchedSeconds ?? 0) >= 12
-        ? "Uses a comfortable +/-20 cent range"
+        ? "Clear notes within +/-20c of nearest note"
         : "Not enough clear pitch data",
     tone: "bg-orange-50 text-orange-800",
     icon: MusicalNoteIcon,
@@ -868,7 +884,11 @@ onMounted(async () => {
                 Practice observations
               </h2>
               <p class="mt-2 max-w-2xl text-sm leading-6 text-stone-500">
-                {{ reviewMoments.length ? `${reviewMoments.length} private movement note available.` : "No persistent movement concern was recorded." }}
+                {{
+                  reviewMoments.length || pitchEvidenceMoments.length
+                    ? `${reviewMoments.length + pitchEvidenceMoments.length} private practice ${reviewMoments.length + pitchEvidenceMoments.length === 1 ? "note" : "notes"} available.`
+                    : "No persistent movement or sound concern was recorded."
+                }}
                 Original video is not stored.
               </p>
             </div>
@@ -887,7 +907,49 @@ onMounted(async () => {
             </div>
           </div>
 
-          <div v-if="showObservationDetails && reviewMoments.length" class="space-y-6 border-t border-stone-100 p-5">
+          <div
+            v-if="showObservationDetails && (reviewMoments.length || pitchEvidenceMoments.length)"
+            class="space-y-6 border-t border-stone-100 p-5"
+          >
+            <article
+              v-if="pitchEvidenceMoments.length"
+              class="rounded-2xl border border-orange-100 bg-orange-50/70 p-5"
+            >
+              <div class="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
+                <div>
+                  <p class="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-orange-600">
+                    Local sound evidence
+                  </p>
+                  <h3 class="text-lg font-semibold text-stage-950">Places to listen again next time</h3>
+                  <p class="mt-1 text-sm leading-6 text-stone-600">
+                    Bowly keeps only timing and pitch-distance summaries, not raw audio.
+                  </p>
+                </div>
+                <MusicalNoteIcon class="h-7 w-7 text-orange-500" />
+              </div>
+
+              <div class="mt-5 grid gap-3 md:grid-cols-3">
+                <div
+                  v-for="moment in pitchEvidenceMoments"
+                  :key="moment.id"
+                  class="rounded-xl border border-orange-100 bg-white/80 p-4"
+                >
+                  <p class="text-xs font-semibold uppercase tracking-[0.14em] text-orange-600">
+                    {{ formatSessionOffset(moment.startOffsetSeconds) }}-{{ formatSessionOffset(moment.endOffsetSeconds) }}
+                  </p>
+                  <p class="mt-2 text-sm font-semibold text-stage-950">
+                    {{ moment.noteName ? `${moment.noteName} was ` : "Pitch was " }}{{ pitchDirectionLabel(moment.direction) }}
+                  </p>
+                  <p class="mt-2 text-sm leading-6 text-stone-600">
+                    About {{ moment.totalDurationSeconds }} sec, average {{ moment.averageAbsCents }} cents from the nearest note.
+                  </p>
+                  <p class="mt-3 text-sm font-medium text-orange-800">
+                    Next time: slow this phrase down and listen for one centered note.
+                  </p>
+                </div>
+              </div>
+            </article>
+
             <article
               v-for="moment in reviewMoments"
               :key="moment.id"

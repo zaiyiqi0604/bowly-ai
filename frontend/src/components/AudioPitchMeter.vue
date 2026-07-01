@@ -44,8 +44,8 @@ const tuningState = computed(() => {
   const absoluteOffset = Math.abs(props.centsOffset);
   if (absoluteOffset <= 20) {
     return {
-      label: "In tune",
-      detail: "Close to the nearest standard note.",
+      label: "Centered",
+      detail: "Within +/-20 cents of the nearest note.",
       tone: "tuned",
     };
   }
@@ -116,7 +116,7 @@ const shortNoteName = computed(() => props.noteName.replace(/\d+$/, ""));
       <div class="min-w-0 flex-1">
         <div v-if="!compact" class="mb-1 flex justify-between text-[9px] font-medium uppercase tracking-[0.1em] text-white/35">
           <span>Low</span>
-          <span class="text-lime-200/70">In tune</span>
+          <span class="text-lime-200/70">Center</span>
           <span>High</span>
         </div>
         <div class="relative" :class="compact ? 'h-4' : 'h-5'">

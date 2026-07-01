@@ -60,6 +60,19 @@ export interface PracticeReviewMoment {
   after?: AnonymousPoseSnapshot;
 }
 
+export interface PitchEvidenceMoment {
+  id: string;
+  firstSeenAt: number;
+  lastSeenAt: number;
+  startOffsetSeconds: number;
+  endOffsetSeconds: number;
+  totalDurationSeconds: number;
+  averageAbsCents: number;
+  peakAbsCents: number;
+  noteName?: string;
+  direction: "sharp" | "flat" | "mixed";
+}
+
 export interface PracticeActivityStats {
   phraseCount: number;
   phraseDurationsSeconds: number[];
@@ -72,6 +85,7 @@ export interface PracticeActivityStats {
   inTunePercent: number;
   stablePitchPercent: number;
   pitchDataQuality: "insufficient" | "limited" | "good";
+  pitchMoments?: PitchEvidenceMoment[];
 }
 
 export interface PracticeSessionRecord {
