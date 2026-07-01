@@ -560,10 +560,10 @@ function closeActiveObservations() {
 </script>
 
 <template>
-  <section class="min-h-[calc(100vh-4.5rem)] bg-stage-950 pb-0 text-white">
+  <section class="min-h-[calc(100svh-var(--app-header-height,4.5rem))] bg-stage-950 pb-0 text-white">
     <div class="mx-auto grid max-w-[1600px] xl:grid-cols-[minmax(0,2.25fr)_minmax(340px,0.9fr)]">
       <div class="min-w-0 border-white/10 xl:border-r">
-        <div class="relative max-md:h-[calc(100dvh-4.25rem)] max-md:min-h-[34rem] max-md:overflow-hidden">
+        <div class="relative max-md:h-[calc(100svh-var(--app-header-height,3.5rem))] max-md:min-h-[32rem] max-md:overflow-hidden md:min-h-[calc(100svh-var(--app-header-height,4.5rem))]">
           <CameraPanel
             class="max-md:!h-full max-md:!min-h-0"
             :show-guide-overlay="showGuideOverlay"
